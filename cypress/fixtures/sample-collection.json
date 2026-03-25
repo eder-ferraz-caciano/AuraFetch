@@ -1,0 +1,100 @@
+{
+  "collection": [
+    {
+      "id": "ws-fixture-001",
+      "name": "Workspace Teste",
+      "type": "workspace",
+      "expanded": true,
+      "environments": [
+        {
+          "id": "env-fixture-001",
+          "name": "Desenvolvimento",
+          "variables": [
+            { "key": "base_url", "value": "https://postman-echo.com" },
+            { "key": "token_teste", "value": "abc123" }
+          ]
+        }
+      ],
+      "children": [
+        {
+          "id": "folder-fixture-001",
+          "name": "Pasta A",
+          "type": "folder",
+          "expanded": false,
+          "folderConfig": { "auth": { "type": "none" }, "script": "" },
+          "children": [
+            {
+              "id": "req-fixture-001",
+              "name": "GET Lista",
+              "type": "request",
+              "children": [],
+              "folderConfig": null,
+              "request": {
+                "id": "req-fixture-001",
+                "name": "GET Lista",
+                "method": "GET",
+                "url": "https://postman-echo.com/get",
+                "headers": [],
+                "params": [],
+                "pathParams": [],
+                "body": "",
+                "bodyType": "none",
+                "formData": [],
+                "auth": { "type": "inherit" }
+              }
+            }
+          ]
+        },
+        {
+          "id": "folder-fixture-002",
+          "name": "Pasta B",
+          "type": "folder",
+          "expanded": false,
+          "folderConfig": { "auth": { "type": "none" }, "script": "" },
+          "children": [
+            {
+              "id": "req-fixture-002",
+              "name": "POST Dados",
+              "type": "request",
+              "children": [],
+              "folderConfig": null,
+              "request": {
+                "id": "req-fixture-002",
+                "name": "POST Dados",
+                "method": "POST",
+                "url": "https://postman-echo.com/post",
+                "headers": [],
+                "params": [],
+                "pathParams": [],
+                "body": "{\"chave\": \"valor\"}",
+                "bodyType": "json",
+                "formData": [],
+                "auth": { "type": "inherit" }
+              }
+            },
+            {
+              "id": "req-fixture-003",
+              "name": "PUT Update",
+              "type": "request",
+              "children": [],
+              "folderConfig": null,
+              "request": {
+                "id": "req-fixture-003",
+                "name": "PUT Update",
+                "method": "PUT",
+                "url": "https://postman-echo.com/put",
+                "headers": [],
+                "params": [],
+                "pathParams": [],
+                "body": "",
+                "bodyType": "none",
+                "formData": [],
+                "auth": { "type": "inherit" }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
