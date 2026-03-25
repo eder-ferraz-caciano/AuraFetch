@@ -858,8 +858,11 @@ describe('AuraFetch - Renderização de Response', () => {
   // ────────────────────────────────────────
   // JSON
   // ────────────────────────────────────────
+  // Nota: o painel de response possui 3 abas: "Body" (response), "Response Headers" e "Console".
+  // Não existe aba "Raw" na implementação atual — os testes abaixo cobrem o que de fato existe.
+
   describe('JSON', () => {
-    it('response JSON exibe formatação pretty print', () => {
+    it('response JSON exibe formatação pretty print no CodeMirror', () => {
       cy.intercept('GET', `${BASE}/get*`, {
         statusCode: 200,
         body: { usuario: { nome: 'Alice', idade: 30 }, ativo: true }
@@ -868,7 +871,7 @@ describe('AuraFetch - Renderização de Response', () => {
       cy.contains('button', 'Fazer Disparo').click({ force: true });
       cy.wait('@req');
       cy.get('.status-badge', { timeout: 15000 }).should('be.visible');
-      // CodeMirror deve mostrar indentação
+      // CodeMirror exibe o JSON formatado
       cy.get('.cm-content').should('contain', 'usuario').and('contain', 'nome');
     });
 
@@ -879,7 +882,7 @@ describe('AuraFetch - Renderização de Response', () => {
       cy.contains('button', 'Fazer Disparo').click({ force: true });
       cy.wait('@bigReq');
       cy.get('.status-badge', { timeout: 15000 }).should('be.visible');
-      // UI ainda responde — clicar na árvore
+      // UI ainda responde — árvore clicável
       cy.get('.sidebar-tree-container').contains('Listar Dados').should('be.visible');
     });
   });
@@ -1137,6 +1140,17 @@ describe('AuraFetch - Import/Export de Coleção e Download de Response', () => 
       cy.get('.sidebar-tree-container').should('contain', 'GET Lista');
     });
 
+    it('environments importados são preservados', () => {
+      // O fixture tem 1 environment chamado "Desenvolvimento" com variáveis base_url e token_teste
+      cy.get('label[title="Importar"] input[type="file"]').selectFile('cypress/fixtures/sample-collection.json', { force: true });
+      cy.get('.sidebar-tree-container', { timeout: 15000 }).should('contain', 'Workspace Teste');
+      // Abrir o workspace e verificar environments
+      cy.get('.sidebar-tree-container').contains('.workspace-node', 'Workspace Teste')
+        .find('.node-name').click({ force: true });
+      cy.get('.ws-config-tab').contains('Environments').click({ force: true });
+      cy.contains('Desenvolvimento').should('be.visible');
+    });
+
     it('importar JSON inválido exibe mensagem de erro sem travar', () => {
       const invalidJson = new Blob(['{"collection": invalid json}'], { type: 'application/json' });
       const file = new File([invalidJson], 'invalid.json', { type: 'application/json' });
@@ -1317,15 +1331,33 @@ describe('AuraFetch - Autenticação', () => {
       cy.get('input[placeholder*="valor"]').should('be.visible');
     });
 
-    it('API key adicionada como header quando configurada em "header"', () => {
+    it('API key adicionada como header quando configurada em "In Headers"', () => {
       cy.get('.glass-panel select').select('apikey');
       cy.get('input[placeholder*="X-Api-Key"]').clear().type('X-Minha-Chave');
       cy.get('input[placeholder*="valor"]').clear().type('chave_secreta_123');
+      // Garantir que "In Headers" está selecionado
+      cy.get('.glass-panel').contains('Location').parent().find('select').select('header');
       cy.intercept('GET', `${POSTMAN_ECHO}/headers`).as('req');
       cy.get('input[placeholder="{{base_url}}/api/..."]').clear().type(`${POSTMAN_ECHO}/headers`, { parseSpecialCharSequences: false });
       cy.contains('button', 'Fazer Disparo').click({ force: true });
       cy.wait('@req').then(interception => {
         expect(interception.request.headers['x-minha-chave']).to.equal('chave_secreta_123');
+      });
+    });
+
+    it('API key adicionada como query param quando configurada em "In Query Params"', () => {
+      cy.get('.glass-panel select').select('apikey');
+      cy.get('input[placeholder*="X-Api-Key"]').clear().type('api_key');
+      cy.get('input[placeholder*="valor"]').clear().type('qp_valor_123');
+      // Mudar para "In Query Params"
+      cy.get('.glass-panel').contains('Location').parent().find('select').select('query');
+      cy.intercept('GET', `${POSTMAN_ECHO}/get*`).as('req');
+      cy.get('input[placeholder="{{base_url}}/api/..."]').clear().type(`${POSTMAN_ECHO}/get`, { parseSpecialCharSequences: false });
+      cy.contains('button', 'Fazer Disparo').click({ force: true });
+      cy.wait('@req').then(interception => {
+        // API key deve aparecer na URL, não no header
+        expect(interception.request.url).to.include('api_key=qp_valor_123');
+        expect(interception.request.headers['api_key']).to.be.undefined;
       });
     });
   });
