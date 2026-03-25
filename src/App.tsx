@@ -50,6 +50,20 @@ const safeFetch = async (url: string, init?: RequestInit) => {
 const MAX_FILE_UPLOAD_MB = 50;
 const MAX_FILE_UPLOAD_BYTES = MAX_FILE_UPLOAD_MB * 1024 * 1024;
 
+const readFileWithSizeGuard = async (filePath: string, fileName: string): Promise<Uint8Array<ArrayBuffer>> => {
+  if (!isTauri()) {
+    throw new Error(`Upload de arquivo não disponível na versão web. Use o aplicativo desktop para enviar arquivos.`);
+  }
+  const bytes = await tauriReadFile(filePath);
+  if (bytes.length > MAX_FILE_UPLOAD_BYTES) {
+    throw new Error(
+      `Arquivo "${fileName}" excede o limite de ${MAX_FILE_UPLOAD_MB}MB ` +
+      `(${(bytes.length / 1024 / 1024).toFixed(1)}MB). Reduza o tamanho do arquivo.`
+    );
+  }
+  return bytes;
+};
+
 // Types
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'WS';
 type AuthType = 'none' | 'bearer' | 'basic' | 'apikey' | 'inherit' | 'oauth2';
@@ -1364,20 +1378,6 @@ aurafetch.log("Token renovado e salvo na pasta!");`;
       });
       setWsInputMessage('');
     }
-  };
-
-  const readFileWithSizeGuard = async (filePath: string, fileName: string): Promise<Uint8Array<ArrayBuffer>> => {
-    if (!isTauri()) {
-      throw new Error(`Upload de arquivo não disponível na versão web. Use o aplicativo desktop para enviar arquivos.`);
-    }
-    const bytes = await tauriReadFile(filePath);
-    if (bytes.length > MAX_FILE_UPLOAD_BYTES) {
-      throw new Error(
-        `Arquivo "${fileName}" excede o limite de ${MAX_FILE_UPLOAD_MB}MB ` +
-        `(${(bytes.length / 1024 / 1024).toFixed(1)}MB). Reduza o tamanho do arquivo.`
-      );
-    }
-    return bytes;
   };
 
   const handleSend = async () => {
