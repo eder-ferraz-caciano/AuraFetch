@@ -1,5 +1,5 @@
 import './index.css';
-import React, { useState, useRef, useEffect, Fragment } from 'react';
+import React, { useState, useRef, useEffect, useCallback, Fragment } from 'react';
 import {
   Folder, FileText, Plus, Download, Upload,
   Play, Square, Trash2, Send, Clock, Edit2, FilePlus, Terminal, AlertTriangle,
@@ -707,10 +707,10 @@ export default function App() {
     document.body.classList.remove('dragging-active');
   };
 
-  const addLog = (type: LogEntry['type'], message: string, data?: any) => {
+  const addLog = useCallback((type: LogEntry['type'], message: string, data?: any) => {
     const newLog: LogEntry = { id: uuidv4(), timestamp: new Date(), type, message, data };
     setActiveLogs(prev => [...prev, newLog]);
-  };
+  }, []);
 
   // Persist State
   useEffect(() => {
