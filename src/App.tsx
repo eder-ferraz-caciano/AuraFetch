@@ -498,8 +498,8 @@ export default function App() {
   };
 
   const addWorkspace = () => {
-    const name = prompt('Nome do novo Workspace:', 'Novo Workspace');
-    if (!name) return;
+    if (!newWorkspaceName.trim()) return;
+    const name = newWorkspaceName.trim();
     const newWs: CollectionNode = {
       id: uuidv4(),
       name,
@@ -513,6 +513,8 @@ export default function App() {
       children: [{ id: uuidv4(), name: 'Nova Pasta', type: 'folder', children: [], folderConfig: { auth: { type: 'none' } } }]
     };
     setCollection(prev => [...prev, newWs]);
+    setNewWorkspaceName('');
+    setShowNewWorkspaceInput(false);
   };
 
   // Default to null to show welcome screen initially
@@ -557,6 +559,8 @@ export default function App() {
   const [openMenuNodeId, setOpenMenuNodeId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
   const [nodeToDelete, setNodeToDelete] = useState<{ id: string, name: string } | null>(null);
+  const [showNewWorkspaceInput, setShowNewWorkspaceInput] = useState(false);
+  const [newWorkspaceName, setNewWorkspaceName] = useState('');
 
   // Timeouts & Abort Controllers
   const [reqTimeoutMs, setReqTimeoutMs] = useState<number>(30000);
@@ -1172,7 +1176,6 @@ aurafetch.log("Token renovado e salvo na pasta!");`;
 
     // Debugging only if it's a request or if there's an issue
     if (result.includes('{{') && !path) {
-       console.warn(`[Variables] No path found for node ${targetNodeId}. Variable resolution might fail.`);
     }
 
     while (result.includes('{{') && iterations < MAX_ITERATIONS) {
@@ -1894,7 +1897,6 @@ aurafetch.log("Token renovado e salvo na pasta!");`;
     } catch (err: any) {
       const errorMsg = err?.message || (typeof err === 'string' ? err : JSON.stringify(err)) || 'Erro interno desconhecido';
       addLog('error', `❌ Falha no Script: ${errorMsg}`);
-      console.error('Folder Script Error:', err);
     } finally {
       setLoading(false);
     }
@@ -2692,7 +2694,7 @@ aurafetch.log("Token renovado e salvo na pasta!");`;
             <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(255,255,255,0.02)' }}>
               <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Coleção</span>
               <div className="sidebar-actions" style={{ gap: '2px' }}>
-                <button className="btn-icon" onClick={addWorkspace} title="Novo Workspace" style={{ padding: '5px' }}><Database size={14} /></button>
+                <button className="btn-icon" onClick={() => setShowNewWorkspaceInput(true)} title="Novo Workspace" style={{ padding: '5px' }}><Database size={14} /></button>
                 <button className="btn-icon" onClick={exportCollection} title="Exportar" style={{ padding: '5px' }}><Download size={14} /></button>
                 <label className="btn-icon" style={{ cursor: 'pointer', margin: 0, padding: '5px' }} title="Importar">
                   <Upload size={14} />
@@ -2700,6 +2702,23 @@ aurafetch.log("Token renovado e salvo na pasta!");`;
                 </label>
               </div>
             </div>
+            {showNewWorkspaceInput ? (
+              <div style={{ display: 'flex', gap: '4px', padding: '4px 8px' }}>
+                <input
+                  className="text-input"
+                  placeholder="Nome do workspace..."
+                  value={newWorkspaceName}
+                  autoFocus
+                  onChange={e => setNewWorkspaceName(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter') addWorkspace();
+                    if (e.key === 'Escape') { setShowNewWorkspaceInput(false); setNewWorkspaceName(''); }
+                  }}
+                  style={{ flex: 1, fontSize: '12px', padding: '4px 8px' }}
+                />
+                <button className="btn btn-primary" style={{ padding: '4px 8px', fontSize: '11px' }} onClick={addWorkspace}>OK</button>
+              </div>
+            ) : null}
 
             {/* 3. Scrollable Tree Area */}
             <div
@@ -2800,7 +2819,7 @@ aurafetch.log("Token renovado e salvo na pasta!");`;
               Selecione uma requisição no menu lateral ou crie uma nova para começar.
             </p>
             <div style={{ display: 'flex', gap: '16px' }}>
-              <button className="btn btn-primary" onClick={addWorkspace}><Database size={16} /> Novo Workspace</button>
+              <button className="btn btn-primary" onClick={() => setShowNewWorkspaceInput(true)}><Database size={16} /> Novo Workspace</button>
             </div>
             <div style={{ marginTop: '24px', paddingTop: '24px', borderTop: '1px dashed var(--border-strong)', width: '100%', maxWidth: '400px', display: 'flex', justifyContent: 'center' }}>
               <button className="btn btn-primary" onClick={generateCrudExample} style={{ background: 'var(--accent-gradient)', border: 'none', boxShadow: '0 4px 15px rgba(99, 102, 241, 0.4)' }}>

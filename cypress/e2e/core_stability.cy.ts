@@ -12,10 +12,9 @@ describe('AuraFetch - Core Stability & Reliability E2E', () => {
     // 1. PERSISTENCE & RELOAD
     // ────────────────────────────────────────────
     it('Deve persistir o Workspace ao recarregar a página', () => {
-        cy.window().then((win) => {
-            cy.stub(win, 'prompt').returns('Workspace Persistente');
-        });
         cy.get('button[title="Novo Workspace"]').click();
+        cy.get('input[placeholder="Nome do workspace..."]', { timeout: 5000 }).should('be.visible').type('Workspace Persistente');
+        cy.get('input[placeholder="Nome do workspace..."]').type('{enter}');
         cy.get('.sidebar-tree-container', { timeout: 10000 }).should('contain', 'Workspace Persistente');
 
         cy.reload();

@@ -35,17 +35,11 @@ describe('AuraFetch – Workspace & Tree E2E', () => {
             .click({ force: true });
     };
 
-    // ─── Helper: create workspace via action-bar button ───
+    // ─── Helper: create workspace via action-bar inline input ───
     const createWorkspace = (name: string) => {
-        cy.window().then((win) => {
-            // Use callsFake to handle multiple stub calls without error
-            if ((win as any).__promptStubbed) {
-                (win.prompt as any).restore?.();
-            }
-            cy.stub(win, 'prompt').returns(name);
-            (win as any).__promptStubbed = true;
-        });
         cy.get('button[title="Novo Workspace"]').click({ force: true });
+        cy.get('input[placeholder="Nome do workspace..."]', { timeout: 5000 }).should('be.visible').type(name);
+        cy.get('input[placeholder="Nome do workspace..."]').type('{enter}');
         cy.get('.sidebar-tree-container').contains(name, { timeout: 10000 }).should('exist');
     };
 
