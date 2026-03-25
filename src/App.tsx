@@ -1,3 +1,4 @@
+import './index.css';
 import React, { useState, useRef, useEffect, Fragment } from 'react';
 import {
   Folder, FileText, Plus, Download, Upload,
@@ -45,7 +46,6 @@ const safeFetch = async (url: string, init?: RequestInit) => {
   }
   return fetch(url, init);
 };
-import './index.css';
 
 // Types
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'WS';
