@@ -531,7 +531,22 @@ export default function App() {
   const [activeResponse, setActiveResponse] = useState<SavedResponse | null>(null);
   const [activeLogs, setActiveLogs] = useState<LogEntry[]>([]);
 
+  // WS refs — declared here so switchActiveNode can reference them
+  const wsInstRef = useRef<WebSocket | null>(null);
+  const wsUnlistenRef = useRef<(() => void) | null>(null);
+  const [wsConnected, setWsConnected] = useState(false);
+
   const switchActiveNode = (nodeId: string | null) => {
+    // Desconectar WS ao trocar de nó
+    if (wsUnlistenRef.current) {
+      wsUnlistenRef.current();
+      wsUnlistenRef.current = null;
+    }
+    if (wsInstRef.current) {
+      wsInstRef.current.disconnect().catch(() => {});
+      wsInstRef.current = null;
+    }
+    setWsConnected(false);
     setActiveNodeId(nodeId);
     setActiveResponse(null);
     setActiveLogs([]);
@@ -1322,33 +1337,60 @@ aurafetch.log("Token renovado e salvo na pasta!");`;
   };
 
   // WS State Reference
-  const wsInstRef = useRef<WebSocket | null>(null);
-  const [wsConnected, setWsConnected] = useState(false);
   const [wsInputMessage, setWsInputMessage] = useState('');
 
   const connectWs = async () => {
-    if (!activeReq) return;
+    if (!activeReq || !activeNodeId) return;
     setLoading(true);
     const targetUrl = applyVariables(activeReq.url, activeReq.id);
     addLog('info', `🔌 Tentando conectar WebSocket em: ${targetUrl}`);
 
     try {
+      // Remove listener anterior se existir
+      if (wsUnlistenRef.current) {
+        wsUnlistenRef.current();
+        wsUnlistenRef.current = null;
+      }
+
       const ws = await WebSocket.connect(targetUrl);
       wsInstRef.current = ws;
       setWsConnected(true);
 
+      const nodeId = activeNodeId;
+
       handleActiveReqChange({
-        wsMessages: [...(activeReq.wsMessages || []), { id: uuidv4(), type: 'info', text: 'Conectado a ' + targetUrl, timestamp: Date.now() }]
+        wsMessages: [{ id: uuidv4(), type: 'info', text: 'Conectado a ' + targetUrl, timestamp: Date.now() }]
       });
 
-      ws.addListener((msg) => {
+      // addListener retorna () => void — a função de cleanup
+      wsUnlistenRef.current = ws.addListener((msg) => {
         let textData = '';
         if (msg.type === 'Text') textData = msg.data as string;
         else if (msg.type === 'Binary') textData = '[Binary Message]';
 
-        handleActiveReqChange({
-          wsMessages: [...(activeReq.wsMessages || []), { id: uuidv4(), type: 'received', text: textData, timestamp: Date.now() }]
+        // Usar setCollection com updater funcional para evitar stale closure
+        setCollection(prev => {
+          const update = (nodes: CollectionNode[]): CollectionNode[] =>
+            nodes.map(node => {
+              if (node.id === nodeId && node.type === 'request' && node.request) {
+                return {
+                  ...node,
+                  request: {
+                    ...node.request,
+                    wsMessages: [
+                      ...(node.request.wsMessages || []),
+                      { id: uuidv4(), type: 'received' as const, text: textData, timestamp: Date.now() }
+                    ]
+                  }
+                };
+              }
+              if (node.children) return { ...node, children: update(node.children) };
+              return node;
+            });
+          return update(prev);
         });
+
+        addLog('info', `📨 WS recebido: ${textData.substring(0, 100)}${textData.length > 100 ? '...' : ''}`);
       });
 
     } catch (err: any) {
@@ -1359,6 +1401,10 @@ aurafetch.log("Token renovado e salvo na pasta!");`;
   };
 
   const disconnectWs = async () => {
+    if (wsUnlistenRef.current) {
+      wsUnlistenRef.current();
+      wsUnlistenRef.current = null;
+    }
     if (wsInstRef.current) {
       await wsInstRef.current.disconnect();
       wsInstRef.current = null;
