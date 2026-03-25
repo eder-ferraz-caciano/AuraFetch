@@ -1900,11 +1900,27 @@ aurafetch.log("Token renovado e salvo na pasta!");`;
     }
   };
 
+  const downloadBlobWeb = (content: string, filename: string, mimeType = 'application/json') => {
+    const blob = new Blob([content], { type: mimeType });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   const exportCollection = async () => {
     try {
       // Export collection (workspaces are inside), and globals
       const db = { collection, globals: globalVariables };
       const content = JSON.stringify(db, null, 2);
+
+      if (!isTauri()) {
+        downloadBlobWeb(content, 'aurafetch_workspace.json');
+        addLog('success', '💾 Workspace exportado (download iniciado).');
+        return;
+      }
 
       const filePath = await tauriSave({
         filters: [{ name: 'AuraFetch Workspace', extensions: ['json'] }],
@@ -1972,6 +1988,21 @@ aurafetch.log("Token renovado e salvo na pasta!");`;
       // Clean name for filename
       const safeName = (activeReq?.name ?? 'response').replace(/[^a-z0-9]/gi, '_').toLowerCase();
 
+      if (!isTauri()) {
+        if (type === 'image' || type === 'pdf') {
+          // data is already a data URL — create direct download link
+          const a = document.createElement('a');
+          a.href = data as string;
+          a.download = `response_${safeName}.${extension}`;
+          a.click();
+        } else {
+          const content = typeof data === 'object' ? JSON.stringify(data, null, 2) : String(data);
+          downloadBlobWeb(content, `response_${safeName}.${extension}`, contentType || 'text/plain');
+        }
+        addLog('success', `📂 Download iniciado.`);
+        return;
+      }
+
       const filePath = await tauriSave({
         filters: [{ name: 'Arquivo de Resposta', extensions: [extension] }],
         defaultPath: `response_${safeName}.${extension}`
@@ -2002,6 +2033,10 @@ aurafetch.log("Token renovado e salvo na pasta!");`;
   };
 
   const pickBinaryFile = async () => {
+    if (!isTauri()) {
+      addLog('error', '❌ Seleção de arquivo binário disponível apenas na versão desktop.');
+      return;
+    }
     try {
       const selected = await tauriOpen({
         multiple: false,
@@ -2022,6 +2057,10 @@ aurafetch.log("Token renovado e salvo na pasta!");`;
   };
 
   const pickFormDataFile = async (fieldId: string) => {
+    if (!isTauri()) {
+      addLog('error', '❌ Seleção de arquivo para form-data disponível apenas na versão desktop.');
+      return;
+    }
     try {
       const selected = await tauriOpen({ multiple: false, title: 'Selecionar arquivo para upload' });
       if (selected && typeof selected === 'string') {
