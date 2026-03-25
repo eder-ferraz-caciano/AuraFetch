@@ -1582,11 +1582,13 @@ aurafetch.log("Token renovado e salvo na pasta!");`;
               fd.append(key, applyVariables(f.value, activeReq.id));
             } else if (f.fileInfo) {
               const bytes = await readFileWithSizeGuard(f.fileInfo.path, f.fileInfo.name);
-              fd.append(key, new Blob([bytes]), f.fileInfo.name);
+              fd.append(key, new Blob([bytes], { type: 'application/octet-stream' }), f.fileInfo.name);
             }
           }
           opts.body = fd;
-          // Note: Browser handles Content-Type with boundary for FormData
+          // Remove any manually set Content-Type header so the boundary is generated correctly
+          const contentHeader = Object.keys(fetchHeaders).find(k => k.toLowerCase() === 'content-type');
+          if (contentHeader) delete fetchHeaders[contentHeader];
         }
       }
 
