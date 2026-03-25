@@ -47,6 +47,9 @@ const safeFetch = async (url: string, init?: RequestInit) => {
   return fetch(url, init);
 };
 
+const MAX_FILE_UPLOAD_MB = 50;
+const MAX_FILE_UPLOAD_BYTES = MAX_FILE_UPLOAD_MB * 1024 * 1024;
+
 // Types
 type HttpMethod = 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH' | 'WS';
 type AuthType = 'none' | 'bearer' | 'basic' | 'apikey' | 'inherit' | 'oauth2';
@@ -1363,6 +1366,20 @@ aurafetch.log("Token renovado e salvo na pasta!");`;
     }
   };
 
+  const readFileWithSizeGuard = async (filePath: string, fileName: string): Promise<Uint8Array<ArrayBuffer>> => {
+    if (!isTauri()) {
+      throw new Error(`Upload de arquivo não disponível na versão web. Use o aplicativo desktop para enviar arquivos.`);
+    }
+    const bytes = await tauriReadFile(filePath);
+    if (bytes.length > MAX_FILE_UPLOAD_BYTES) {
+      throw new Error(
+        `Arquivo "${fileName}" excede o limite de ${MAX_FILE_UPLOAD_MB}MB ` +
+        `(${(bytes.length / 1024 / 1024).toFixed(1)}MB). Reduza o tamanho do arquivo.`
+      );
+    }
+    return bytes;
+  };
+
   const handleSend = async () => {
     if (!activeReq) return;
     if (activeReq.method === 'WS') {
@@ -1506,7 +1523,7 @@ aurafetch.log("Token renovado e salvo na pasta!");`;
           if (!hasContentType) fetchHeaders['Content-Type'] = 'application/x-www-form-urlencoded';
         }
         else if (activeReq.bodyType === 'binary' && activeReq.binaryFile) {
-          const bytes = await tauriReadFile(activeReq.binaryFile.path);
+          const bytes = await readFileWithSizeGuard(activeReq.binaryFile.path, activeReq.binaryFile.name);
           opts.body = bytes;
           const hasContentType = Object.keys(fetchHeaders).some(k => k.toLowerCase() === 'content-type');
           if (!hasContentType) fetchHeaders['Content-Type'] = 'application/octet-stream';
@@ -1519,7 +1536,7 @@ aurafetch.log("Token renovado e salvo na pasta!");`;
             if (f.type === 'text') {
               fd.append(key, applyVariables(f.value, activeReq.id));
             } else if (f.fileInfo) {
-              const bytes = await tauriReadFile(f.fileInfo.path);
+              const bytes = await readFileWithSizeGuard(f.fileInfo.path, f.fileInfo.name);
               fd.append(key, new Blob([bytes]), f.fileInfo.name);
             }
           }
