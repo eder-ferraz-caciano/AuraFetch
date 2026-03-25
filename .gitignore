@@ -29,3 +29,6 @@ cypress/videos
 cypress/downloads
 cypress_results*.txt
 cypress_final*.txt
+
+# Git worktrees
+.worktrees/
