@@ -502,12 +502,6 @@ export default function App() {
   // Default to null to show welcome screen initially
   const [activeNodeId, setActiveNodeId] = useState<string | null>(null);
 
-  const switchActiveNode = (nodeId: string | null) => {
-    setActiveNodeId(nodeId);
-    setActiveResponse(null);
-    setActiveLogs([]);
-  };
-
   // Tabs
   const [activeReqTab, setActiveReqTab] = useState<'auth' | 'headers' | 'body' | 'params' | 'queries'>('auth');
   const [activeFolderSettingTab, setActiveFolderSettingTab] = useState<'auth' | 'vars' | 'headers'>('auth');
@@ -520,6 +514,12 @@ export default function App() {
   // Response and logs live outside the collection — not persisted to localStorage
   const [activeResponse, setActiveResponse] = useState<RequestModel['savedResponse']>(null);
   const [activeLogs, setActiveLogs] = useState<LogEntry[]>([]);
+
+  const switchActiveNode = (nodeId: string | null) => {
+    setActiveNodeId(nodeId);
+    setActiveResponse(null);
+    setActiveLogs([]);
+  };
 
   // Modals & States
   const [editingNodeId, setEditingNodeId] = useState<string | null>(null);
