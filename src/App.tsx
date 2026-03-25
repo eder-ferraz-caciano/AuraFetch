@@ -502,6 +502,12 @@ export default function App() {
   // Default to null to show welcome screen initially
   const [activeNodeId, setActiveNodeId] = useState<string | null>(null);
 
+  const switchActiveNode = (nodeId: string | null) => {
+    setActiveNodeId(nodeId);
+    setActiveResponse(null);
+    setActiveLogs([]);
+  };
+
   // Tabs
   const [activeReqTab, setActiveReqTab] = useState<'auth' | 'headers' | 'body' | 'params' | 'queries'>('auth');
   const [activeFolderSettingTab, setActiveFolderSettingTab] = useState<'auth' | 'vars' | 'headers'>('auth');
@@ -510,6 +516,10 @@ export default function App() {
 
   const [loading, setLoading] = useState(false);
   const [copiedRes, setCopiedRes] = useState(false);
+
+  // Response and logs live outside the collection — not persisted to localStorage
+  const [activeResponse, setActiveResponse] = useState<RequestModel['savedResponse']>(null);
+  const [activeLogs, setActiveLogs] = useState<LogEntry[]>([]);
 
   // Modals & States
   const [editingNodeId, setEditingNodeId] = useState<string | null>(null);
@@ -668,35 +678,7 @@ export default function App() {
 
   const addLog = (type: LogEntry['type'], message: string, data?: any) => {
     const newLog: LogEntry = { id: uuidv4(), timestamp: new Date(), type, message, data };
-
-
-    if (!activeNodeId) return;
-
-    setCollection(prev => {
-      const update = (nodes: CollectionNode[]): CollectionNode[] => {
-        return nodes.map(node => {
-          if (node.id === activeNodeId) {
-            if (node.type === 'request' && node.request) {
-              return {
-                ...node,
-                request: {
-                  ...node.request,
-                  savedLogs: [...(node.request.savedLogs || []), newLog]
-                }
-              };
-            } else if (node.type === 'folder') {
-              return {
-                ...node,
-                savedLogs: [...(node.savedLogs || []), newLog]
-              };
-            }
-          }
-          if (node.children) return { ...node, children: update(node.children!) };
-          return node;
-        });
-      };
-      return update(prev);
-    });
+    setActiveLogs(prev => [...prev, newLog]);
   };
 
   // Persist State
@@ -803,23 +785,32 @@ export default function App() {
 
   const handleActiveReqChange = (updates: Partial<RequestModel>) => {
     if (!activeNodeId) return;
+
+    // Redirect response and logs to separate state — not stored in collection
+    if ('savedResponse' in updates) {
+      setActiveResponse(updates.savedResponse ?? null);
+    }
+    if ('savedLogs' in updates && updates.savedLogs !== undefined) {
+      setActiveLogs(updates.savedLogs);
+    }
+
+    // Remove from collection updates
+    const collectionUpdates = { ...updates };
+    delete collectionUpdates.savedResponse;
+    delete collectionUpdates.savedLogs;
+
+    if (Object.keys(collectionUpdates).length === 0) return;
+
     updateNodeInCollection(activeNodeId, (node) => {
       if (node.type !== 'request' || !node.request) return node;
-
-      let nextReq = { ...node.request, ...updates };
-
-      // Two-way synchronization
-      if (updates.url !== undefined) {
-        nextReq.queryParams = syncUrlToQueryParams(updates.url, nextReq.queryParams);
-        nextReq.params = syncUrlToPathParams(updates.url, nextReq.params);
-      } else if (updates.queryParams !== undefined) {
-        nextReq.url = syncQueryParamsToUrl(nextReq.url, updates.queryParams);
+      let nextReq = { ...node.request, ...collectionUpdates };
+      if (collectionUpdates.url !== undefined) {
+        nextReq.queryParams = syncUrlToQueryParams(collectionUpdates.url, nextReq.queryParams);
+        nextReq.params = syncUrlToPathParams(collectionUpdates.url, nextReq.params);
+      } else if (collectionUpdates.queryParams !== undefined) {
+        nextReq.url = syncQueryParamsToUrl(nextReq.url, collectionUpdates.queryParams);
       }
-
-      return {
-        ...node,
-        request: nextReq
-      };
+      return { ...node, request: nextReq };
     });
   };
 
@@ -860,7 +851,7 @@ export default function App() {
       return node;
     });
     setCollection(updateNode(collection));
-    setActiveNodeId(newFolder.id);
+    switchActiveNode(newFolder.id);
     addLog('info', '📁 Nova pasta criada');
   };
 
@@ -998,7 +989,7 @@ aurafetch.log("Token renovado e salvo na pasta!");`;
     };
 
     setCollection(prev => [...prev, newWorkspace]);
-    setActiveNodeId(workspaceId);
+    switchActiveNode(workspaceId);
     addLog('success', '📦 Nova Workspace de Exemplo criada com ambientes Prod/Dev e CRUD completo');
   };
 
@@ -1014,7 +1005,7 @@ aurafetch.log("Token renovado e salvo na pasta!");`;
       return node;
     });
     setCollection(updateNode(collection));
-    setActiveNodeId(req.id);
+    switchActiveNode(req.id);
     addLog('success', '📄 Nova rota adicionada ao agrupador.');
   };
 
@@ -1038,7 +1029,7 @@ aurafetch.log("Token renovado e salvo na pasta!");`;
       return node;
     });
     setCollection(updateNode(collection));
-    setActiveNodeId(wsReq.id);
+    switchActiveNode(wsReq.id);
     addLog('info', '🌐 Nova conexão WebSocket adicionada.');
   };
 
@@ -1070,7 +1061,7 @@ aurafetch.log("Token renovado e salvo na pasta!");`;
     }
 
     setCollection(newColl);
-    setActiveNodeId(id);
+    switchActiveNode(id);
     addLog('success', `📄 Requisição clonada: ${clonedReq.name}`);
   };
 
@@ -1092,7 +1083,7 @@ aurafetch.log("Token renovado e salvo na pasta!");`;
     addLog('warn', `🗑️ Item deletado: ${nodeToDelete.name}`);
 
     if (activeNodeId === nodeId) {
-      setActiveNodeId(null);
+      switchActiveNode(null);
     }
 
     setNodeToDelete(null);
@@ -1885,7 +1876,7 @@ aurafetch.log("Token renovado e salvo na pasta!");`;
           setCollection(obj);
         }
 
-        setActiveNodeId(null);
+        switchActiveNode(null);
         addLog('success', `📦 Importação de "${file.name}" feita 100%.`);
       } catch (err) {
         addLog('error', `❌ O arquivo JSON é inválido.`);
@@ -1896,17 +1887,17 @@ aurafetch.log("Token renovado e salvo na pasta!");`;
   };
 
   const copyResponse = () => {
-    if (!activeReq || !activeReq.savedResponse) return;
-    const stringData = typeof activeReq.savedResponse.data === 'object' ? JSON.stringify(activeReq.savedResponse.data, null, 2) : String(activeReq.savedResponse.data);
+    if (!activeResponse) return;
+    const stringData = typeof activeResponse.data === 'object' ? JSON.stringify(activeResponse.data, null, 2) : String(activeResponse.data);
     navigator.clipboard.writeText(stringData);
     setCopiedRes(true);
     setTimeout(() => setCopiedRes(false), 2000);
   };
 
   const downloadResponse = async () => {
-    if (!activeReq?.savedResponse) return;
+    if (!activeResponse) return;
     try {
-      const { data, type, contentType } = activeReq.savedResponse;
+      const { data, type, contentType } = activeResponse;
       let extension = 'txt';
       if (type === 'json') extension = 'json';
       else if (type === 'image') {
@@ -1917,7 +1908,7 @@ aurafetch.log("Token renovado e salvo na pasta!");`;
       else if (type === 'html') extension = 'html';
 
       // Clean name for filename
-      const safeName = activeReq.name.replace(/[^a-z0-9]/gi, '_').toLowerCase();
+      const safeName = (activeReq?.name ?? 'response').replace(/[^a-z0-9]/gi, '_').toLowerCase();
 
       const filePath = await tauriSave({
         filters: [{ name: 'Arquivo de Resposta', extensions: [extension] }],
@@ -2266,7 +2257,7 @@ aurafetch.log("Token renovado e salvo na pasta!");`;
             const dId = e.dataTransfer.getData('text/plain') || draggedNodeIdRef.current;
             if (dId) handleDrop(node.id, isInside, isTop);
           }}
-          onClick={() => { setActiveNodeId(node.id); setOpenMenuNodeId(null); }}
+          onClick={() => { switchActiveNode(node.id); setOpenMenuNodeId(null); }}
           style={{ paddingLeft: `${depth * 14 + 8}px`, opacity: draggedNodeIdRef.current === node.id ? 0.3 : 1 }}
         >
           {/* ── Conteúdo ── */}
@@ -2560,7 +2551,7 @@ aurafetch.log("Token renovado e salvo na pasta!");`;
         {/* 1. Header (Fixed Top) */}
         <div style={{ padding: '20px 16px 14px 16px', borderBottom: '1px solid var(--border-subtle)', background: 'rgba(0,0,0,0.1)' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
-            <h2 className="app-title" onClick={() => setActiveNodeId(null)} style={{ cursor: 'pointer', margin: 0 }}>
+            <h2 className="app-title" onClick={() => switchActiveNode(null)} style={{ cursor: 'pointer', margin: 0 }}>
               <span className="highlight">Aura</span>Fetch
             </h2>
           </div>
@@ -2675,7 +2666,7 @@ aurafetch.log("Token renovado e salvo na pasta!");`;
                 <div
                   key={entry.id}
                   className="history-card"
-                  onClick={() => setActiveNodeId(entry.requestId)}
+                  onClick={() => switchActiveNode(entry.requestId)}
                 >
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                     <span className={`method-${entry.method}`} style={{ fontSize: '10px', fontWeight: 900 }}>{entry.method}</span>
@@ -3084,9 +3075,7 @@ aurafetch.log("Token renovado e salvo na pasta!");`;
 
             {/* LOGS PANEL */}
             <div className="glass-panel" style={{ padding: '0', gridColumn: '1 / -1', overflow: 'hidden', borderTop: '1px solid var(--border-subtle)' }}>
-              {renderConsole(activeNode.savedLogs, () => {
-                updateNodeInCollection(activeNode.id, node => ({ ...node, savedLogs: [] }));
-              })}
+              {renderConsole(activeLogs, () => setActiveLogs([]))}
             </div>
           </div>
         ) : (
@@ -3613,40 +3602,40 @@ aurafetch.log("Token renovado e salvo na pasta!");`;
                   {activeReq?.method !== 'WS' && (
                     <>
                       <div className={`tab ${activeResTab === 'response' ? 'active' : ''}`} onClick={() => setActiveResTab('response')}>
-                        Resposta Renderizada {activeReq?.savedResponse && <span className={`status-dot ${activeReq.savedResponse.status >= 200 && activeReq.savedResponse.status < 300 ? 'dot-success' : activeReq.savedResponse.status === 0 ? 'dot-warn' : 'dot-error'}`}></span>}
+                        Resposta Renderizada {activeResponse && <span className={`status-dot ${activeResponse.status >= 200 && activeResponse.status < 300 ? 'dot-success' : activeResponse.status === 0 ? 'dot-warn' : 'dot-error'}`}></span>}
                       </div>
                       <div className={`tab ${activeResTab === 'headers' ? 'active' : ''}`} onClick={() => setActiveResTab('headers')}>
-                        Response Headers <span className="badge">{activeReq?.savedResponse?.headers ? Object.keys(activeReq.savedResponse.headers).length : ''}</span>
+                        Response Headers <span className="badge">{activeResponse?.headers ? Object.keys(activeResponse.headers).length : ''}</span>
                       </div>
                     </>
                   )}
                   <div className={`tab ${activeResTab === 'console' || activeReq?.method === 'WS' ? 'active' : ''}`} onClick={() => setActiveResTab('console')}>
-                    <Terminal size={14} /> Console / Timestamps <span className="badge">{(activeReq?.savedLogs || []).length}</span>
+                    <Terminal size={14} /> Console / Timestamps <span className="badge">{activeLogs.length}</span>
                   </div>
                 </div>
 
                 {/* WS Specific Right Panel Override */}
                 {activeReq?.method === 'WS' ? (
                   <div className="console-panel body-content">
-                    {renderConsole(activeReq?.savedLogs, () => handleActiveReqChange({ savedLogs: [] }))}
+                    {renderConsole(activeLogs, () => setActiveLogs([]))}
                   </div>
                 ) : (
                   <>
                     {/* Response Panel Content */}
                     {activeResTab === 'response' && (
                       <div className="response-panel body-content">
-                        {activeReq?.savedResponse ? (
+                        {activeResponse ? (
                           <>
                             <div className="response-header" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '20px', alignItems: 'center' }}>
                               <div style={{ display: 'flex', gap: '16px', alignItems: 'center' }}>
-                                <span className={`status-badge ${activeReq.savedResponse.status >= 200 && activeReq.savedResponse.status < 300 ? 'status-success' : activeReq.savedResponse.status === 0 ? 'status-warning' : 'status-error'}`}>
-                                  {activeReq.savedResponse.status === 0 ? 'ERR/000' : `${activeReq.savedResponse.status} ${activeReq.savedResponse.statusText}`}
+                                <span className={`status-badge ${activeResponse.status >= 200 && activeResponse.status < 300 ? 'status-success' : activeResponse.status === 0 ? 'status-warning' : 'status-error'}`}>
+                                  {activeResponse.status === 0 ? 'ERR/000' : `${activeResponse.status} ${activeResponse.statusText}`}
                                 </span>
-                                <span style={{ color: 'var(--text-muted)', fontSize: '13px', fontWeight: 500, fontFamily: 'var(--font-mono)' }}>Ping: <span style={{ color: 'var(--info)' }}>{activeReq.savedResponse.time} ms</span></span>
+                                <span style={{ color: 'var(--text-muted)', fontSize: '13px', fontWeight: 500, fontFamily: 'var(--font-mono)' }}>Ping: <span style={{ color: 'var(--info)' }}>{activeResponse.time} ms</span></span>
                               </div>
 
                               <div style={{ display: 'flex', gap: '8px' }}>
-                                <button className="btn btn-secondary" onClick={() => handleActiveReqChange({ savedResponse: null, savedLogs: [] })} style={{ padding: '6px 12px', fontSize: '12px', color: 'var(--danger)', borderColor: 'rgba(239, 68, 68, 0.3)' }}>
+                                <button className="btn btn-secondary" onClick={() => { setActiveResponse(null); setActiveLogs([]); }} style={{ padding: '6px 12px', fontSize: '12px', color: 'var(--danger)', borderColor: 'rgba(239, 68, 68, 0.3)' }}>
                                   <Trash2 size={14} /> Limpar
                                 </button>
                                 <button className="btn btn-secondary" onClick={copyResponse} style={{ padding: '6px 12px', fontSize: '12px' }}>
@@ -3658,15 +3647,15 @@ aurafetch.log("Token renovado e salvo na pasta!");`;
                               </div>
                             </div>
                             <div style={{ flex: 1, marginTop: '12px', borderRadius: '6px', border: '1px solid var(--border-subtle)', background: '#212121', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
-                              {activeReq.savedResponse.type === 'image' ? (
+                              {activeResponse.type === 'image' ? (
                                 <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'auto', padding: '20px' }}>
-                                  <img src={activeReq.savedResponse.data} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: '4px', boxShadow: '0 4px 20px rgba(0,0,0,0.5)' }} alt="Response" />
+                                  <img src={activeResponse.data} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: '4px', boxShadow: '0 4px 20px rgba(0,0,0,0.5)' }} alt="Response" />
                                 </div>
-                              ) : activeReq.savedResponse.type === 'pdf' ? (
-                                <iframe src={activeReq.savedResponse.data} style={{ width: '100%', height: '100%', border: 'none' }} title="PDF Preview" />
-                              ) : activeReq.savedResponse.type === 'html' ? (
-                                <iframe srcDoc={activeReq.savedResponse.data} style={{ width: '100%', height: '100%', border: 'none', background: 'white' }} title="HTML Preview" />
-                              ) : activeReq.savedResponse.type === 'binary' ? (
+                              ) : activeResponse.type === 'pdf' ? (
+                                <iframe src={activeResponse.data} style={{ width: '100%', height: '100%', border: 'none' }} title="PDF Preview" />
+                              ) : activeResponse.type === 'html' ? (
+                                <iframe srcDoc={activeResponse.data} style={{ width: '100%', height: '100%', border: 'none', background: 'white' }} title="HTML Preview" />
+                              ) : activeResponse.type === 'binary' ? (
                                 <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', gap: '15px' }}>
                                   <Database size={48} style={{ opacity: 0.3 }} />
                                   <div style={{ textAlign: 'center' }}>
@@ -3679,7 +3668,7 @@ aurafetch.log("Token renovado e salvo na pasta!");`;
                                 </div>
                               ) : (
                                 <CodeMirror
-                                  value={typeof activeReq.savedResponse.data === 'object' ? JSON.stringify(activeReq.savedResponse.data, null, 2) : String(activeReq.savedResponse.data || "(Nenhum conteúdo renderizável)")}
+                                  value={typeof activeResponse.data === 'object' ? JSON.stringify(activeResponse.data, null, 2) : String(activeResponse.data || "(Nenhum conteúdo renderizável)")}
                                   extensions={[json()]}
                                   theme={oneDark}
                                   readOnly={true}
@@ -3706,14 +3695,14 @@ aurafetch.log("Token renovado e salvo na pasta!");`;
 
                     {activeResTab === 'headers' && (
                       <div className="response-panel body-content" style={{ padding: '24px' }}>
-                        {activeReq?.savedResponse?.headers ? (
+                        {activeResponse?.headers ? (
                           <div className="glass-panel" style={{ padding: 0, overflow: 'hidden' }}>
                             <div className="headers-grid header-row-title" style={{ gridTemplateColumns: 'minmax(200px, 1fr) 2fr', background: 'rgba(0,0,0,0.2)', padding: '12px 20px' }}>
                               <div>Header Key / Chave</div>
                               <div>Value / Valor</div>
                             </div>
                             <div style={{ maxHeight: '500px', overflowY: 'auto' }}>
-                              {Object.entries(activeReq.savedResponse.headers).map(([key, value]) => (
+                              {Object.entries(activeResponse.headers).map(([key, value]) => (
                                 <div key={key} className="headers-grid" style={{ gridTemplateColumns: 'minmax(200px, 1fr) 2fr', borderTop: '1px solid var(--border-subtle)', padding: '10px 20px', fontSize: '13px' }}>
                                   <div style={{ color: 'var(--text-secondary)', fontWeight: 600, fontFamily: 'var(--font-mono)' }}>{key}</div>
                                   <div style={{ color: 'var(--text-primary)', wordBreak: 'break-all', fontFamily: 'var(--font-mono)' }}>{value}</div>
@@ -3732,7 +3721,7 @@ aurafetch.log("Token renovado e salvo na pasta!");`;
                     {/* Console Panel Content */}
                     {activeResTab === 'console' && (
                       <div className="console-panel body-content">
-                        {renderConsole(activeReq?.savedLogs, () => handleActiveReqChange({ savedLogs: [] }))}
+                        {renderConsole(activeLogs, () => setActiveLogs([]))}
                       </div>
                     )}
                   </>
