@@ -114,6 +114,7 @@ interface FormDataField {
   type: 'text' | 'file';
   enabled: boolean;
   fileInfo?: { name: string; path: string };
+  webFile?: File;   // Web mode only: File object do browser
 }
 
 interface RequestModel {
@@ -132,6 +133,7 @@ interface RequestModel {
   graphqlVariables?: string;
   wsMessages?: { id: string; type: 'sent' | 'received' | 'info' | 'error'; text: string; timestamp: number }[];
   binaryFile?: { name: string; path: string } | null;
+  webBinaryFile?: File;  // Web mode only: File object do browser para binary upload
 }
 
 interface SavedResponse {
@@ -1337,6 +1339,7 @@ aurafetch.log("Token renovado e salvo na pasta!");`;
 
   // WS State Reference
   const [wsInputMessage, setWsInputMessage] = useState('');
+  const webBinaryFileRef = useRef<HTMLInputElement>(null);
 
   const connectWs = async () => {
     if (!activeReq || !activeNodeId) return;
@@ -1568,7 +1571,15 @@ aurafetch.log("Token renovado e salvo na pasta!");`;
           if (!hasContentType) fetchHeaders['Content-Type'] = 'application/x-www-form-urlencoded';
         }
         else if (activeReq.bodyType === 'binary' && activeReq.binaryFile) {
-          const bytes = await readFileWithSizeGuard(activeReq.binaryFile.path, activeReq.binaryFile.name);
+          let bytes: Uint8Array<ArrayBuffer>;
+          if (!isTauri() && activeReq.webBinaryFile) {
+            if (activeReq.webBinaryFile.size > MAX_FILE_UPLOAD_BYTES) {
+              throw new Error(`Arquivo "${activeReq.webBinaryFile.name}" excede o limite de ${MAX_FILE_UPLOAD_MB}MB`);
+            }
+            bytes = new Uint8Array(await activeReq.webBinaryFile.arrayBuffer()) as Uint8Array<ArrayBuffer>;
+          } else {
+            bytes = await readFileWithSizeGuard(activeReq.binaryFile.path, activeReq.binaryFile.name);
+          }
           opts.body = bytes;
           const hasContentType = Object.keys(fetchHeaders).some(k => k.toLowerCase() === 'content-type');
           if (!hasContentType) fetchHeaders['Content-Type'] = 'application/octet-stream';
@@ -1581,7 +1592,15 @@ aurafetch.log("Token renovado e salvo na pasta!");`;
             if (f.type === 'text') {
               fd.append(key, applyVariables(f.value, activeReq.id));
             } else if (f.fileInfo) {
-              const bytes = await readFileWithSizeGuard(f.fileInfo.path, f.fileInfo.name);
+              let bytes: Uint8Array<ArrayBuffer>;
+              if (!isTauri() && f.webFile) {
+                if (f.webFile.size > MAX_FILE_UPLOAD_BYTES) {
+                  throw new Error(`Arquivo "${f.webFile.name}" excede o limite de ${MAX_FILE_UPLOAD_MB}MB`);
+                }
+                bytes = new Uint8Array(await f.webFile.arrayBuffer()) as Uint8Array<ArrayBuffer>;
+              } else {
+                bytes = await readFileWithSizeGuard(f.fileInfo.path, f.fileInfo.name);
+              }
               fd.append(key, new Blob([bytes], { type: 'application/octet-stream' }), f.fileInfo.name);
             }
           }
@@ -2034,7 +2053,7 @@ aurafetch.log("Token renovado e salvo na pasta!");`;
 
   const pickBinaryFile = async () => {
     if (!isTauri()) {
-      addLog('error', '❌ Seleção de arquivo binário disponível apenas na versão desktop.');
+      webBinaryFileRef.current?.click();
       return;
     }
     try {
@@ -2514,6 +2533,29 @@ aurafetch.log("Token renovado e salvo na pasta!");`;
             </div>
           </div>
         </div>
+      )}
+
+      {/* Web binary file picker (hidden — web mode only) */}
+      {!isTauri() && (
+        <input
+          type="file"
+          ref={webBinaryFileRef}
+          data-testid="binary-file-input"
+          style={{ display: 'none' }}
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            if (!file) return;
+            if (file.size > MAX_FILE_UPLOAD_BYTES) {
+              addLog('error', `❌ Arquivo "${file.name}" excede o limite de ${MAX_FILE_UPLOAD_MB}MB. Selecione um arquivo menor.`);
+              return;
+            }
+            handleActiveReqChange({
+              binaryFile: { name: file.name, path: `web::${file.name}` },
+              webBinaryFile: file,
+            });
+            if (e.target) e.target.value = '';
+          }}
+        />
       )}
 
       {/* Modal Confirmation */}
@@ -3566,11 +3608,39 @@ aurafetch.log("Token renovado e salvo na pasta!");`;
                                           handleActiveReqChange({ formData: next });
                                         }}
                                       />
-                                    ) : (
+                                    ) : isTauri() ? (
                                       <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
                                         <button className="btn btn-secondary" style={{ fontSize: '11px', padding: '4px 8px' }} onClick={() => pickFormDataFile(f.id)}>
                                           {f.fileInfo ? 'Trocar' : 'Escolher'}
                                         </button>
+                                        <span style={{ fontSize: '11px', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                          {f.fileInfo?.name || 'Nenhum arquivo'}
+                                        </span>
+                                      </div>
+                                    ) : (
+                                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                                        <label className="btn btn-secondary" style={{ fontSize: '11px', padding: '4px 8px', cursor: 'pointer' }}>
+                                          {f.fileInfo ? 'Trocar' : 'Escolher'}
+                                          <input
+                                            type="file"
+                                            data-testid="formdata-file-input"
+                                            style={{ display: 'none' }}
+                                            onChange={(e) => {
+                                              const file = e.target.files?.[0];
+                                              if (!file) return;
+                                              if (file.size > MAX_FILE_UPLOAD_BYTES) {
+                                                addLog('error', `❌ Arquivo "${file.name}" excede o limite de ${MAX_FILE_UPLOAD_MB}MB. Selecione um arquivo menor.`);
+                                                return;
+                                              }
+                                              const next = activeReq!.formData.map(x =>
+                                                x.id === f.id
+                                                  ? { ...x, fileInfo: { name: file.name, path: `web::${file.name}` }, webFile: file }
+                                                  : x
+                                              );
+                                              handleActiveReqChange({ formData: next });
+                                            }}
+                                          />
+                                        </label>
                                         <span style={{ fontSize: '11px', color: 'var(--text-muted)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                                           {f.fileInfo?.name || 'Nenhum arquivo'}
                                         </span>

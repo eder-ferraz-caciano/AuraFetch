@@ -369,6 +369,71 @@ describe('AuraFetch – Workspace & Tree E2E', () => {
             cy.get('button[title="Nova Req"]').should('not.exist');
         });
     });
+
+  // ═══════════════════════════════════════════════════════════════
+  //  SUITE 8: RENAME, DUPLICAR, ENVS INDEPENDENTES
+  // ═══════════════════════════════════════════════════════════════
+  describe('Rename inline, Duplicar e Envs independentes', () => {
+    beforeEach(() => {
+      cy.clearLocalStorage();
+      cy.visit('/');
+      cy.get('.app-title', { timeout: 30000 }).should('be.visible');
+    });
+
+    it('Renomear pasta via menu mostra input inline (sem prompt nativo)', () => {
+      cy.window().then(win => { cy.stub(win, 'prompt').as('promptSpy'); });
+      cy.contains('.tree-item', 'Meu Servidor/Projeto').within(() => {
+        cy.get('button[title="Opções"]').click({ force: true });
+      });
+      cy.get('.tree-dropdown-menu').contains('Renomear').click();
+      cy.get('@promptSpy').should('not.have.been.called');
+      cy.get('input[value="Meu Servidor/Projeto"]').should('be.visible');
+    });
+
+    it('Renomear pasta preserva as requisições filhas', () => {
+      cy.contains('.tree-item', 'Meu Servidor/Projeto').within(() => {
+        cy.get('button[title="Opções"]').click({ force: true });
+      });
+      cy.get('.tree-dropdown-menu').contains('Renomear').click();
+      cy.get('input[value="Meu Servidor/Projeto"]').clear().type('Pasta Renomeada{enter}');
+      cy.get('.sidebar-tree-container').should('contain', 'Pasta Renomeada');
+      cy.get('.sidebar-tree-container').contains('Pasta Renomeada').click({ force: true });
+      cy.get('.sidebar-tree-container').should('contain', 'Listar Dados');
+    });
+
+    it('Duplicar requisição cria cópia com mesmo método e URL', () => {
+      cy.get('.sidebar-tree-container').contains('Listar Dados').click({ force: true });
+      cy.get('input[placeholder="{{base_url}}/api/..."]').clear().type('https://api.exemplo.com/unique_url_dup', { parseSpecialCharSequences: false });
+      cy.get('.method-select').select('PUT');
+      cy.contains('.tree-item', 'Listar Dados').within(() => {
+        cy.get('button[title="Opções"]').click({ force: true });
+      });
+      cy.get('.tree-dropdown-menu').contains('Duplicar').click();
+      // Deve existir um segundo nó com nome "Listar Dados" ou "Listar Dados (cópia)"
+      cy.get('.sidebar-tree-container .tree-item').filter(':contains("Listar Dados")').should('have.length.at.least', 2);
+      // Clicar na cópia e verificar que tem o mesmo método e URL
+      cy.get('.sidebar-tree-container .tree-item').filter(':contains("Listar Dados")').last().click({ force: true });
+      cy.get('.method-select').should('have.value', 'PUT');
+      cy.get('input[placeholder="{{base_url}}/api/..."]').should('have.value', 'https://api.exemplo.com/unique_url_dup');
+    });
+
+    it('Environments de workspaces diferentes são independentes', () => {
+      // Criar segundo workspace
+      cy.get('button[title="Novo Workspace"]').click();
+      cy.get('input[placeholder="Nome do workspace..."]').type('WS Isolado{enter}');
+      cy.get('.sidebar-tree-container').should('contain', 'WS Isolado');
+      // Adicionar env no primeiro workspace
+      cy.get('.sidebar-tree-container').contains('.workspace-node', 'Workspace', { timeout: 10000 })
+        .find('.node-name').click({ force: true });
+      cy.get('.ws-config-tab').contains('Ambientes').click({ force: true });
+      cy.get('button[title="Novo Ambiente"]').click({ force: true });
+      // Verificar que o env não aparece no segundo workspace
+      cy.get('.sidebar-tree-container').contains('.workspace-node', 'WS Isolado')
+        .find('.node-name').click({ force: true });
+      cy.get('.ws-config-tab').contains('Ambientes').click({ force: true });
+      cy.get('.ws-env-sidebar').should('not.contain', 'Novo Ambiente');
+    });
+  });
 });
 
 // ═══════════════════════════════════════════════════════════════════

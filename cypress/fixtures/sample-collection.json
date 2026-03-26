@@ -5,16 +5,20 @@
       "name": "Workspace Teste",
       "type": "workspace",
       "expanded": true,
-      "environments": [
-        {
-          "id": "env-fixture-001",
-          "name": "Desenvolvimento",
-          "variables": [
-            { "key": "base_url", "value": "https://postman-echo.com" },
-            { "key": "token_teste", "value": "abc123" }
-          ]
-        }
-      ],
+      "workspaceConfig": {
+        "environments": [
+          {
+            "id": "env-fixture-001",
+            "name": "Desenvolvimento",
+            "variables": [
+              { "id": "var-1", "key": "base_url", "value": "https://postman-echo.com" },
+              { "id": "var-2", "key": "token_teste", "value": "abc123" }
+            ]
+          }
+        ],
+        "activeEnvironmentId": null,
+        "history": []
+      },
       "children": [
         {
           "id": "folder-fixture-001",
@@ -37,6 +41,7 @@
                 "headers": [],
                 "params": [],
                 "pathParams": [],
+                "queryParams": [],
                 "body": "",
                 "bodyType": "none",
                 "formData": [],
@@ -66,28 +71,9 @@
                 "headers": [],
                 "params": [],
                 "pathParams": [],
+                "queryParams": [],
                 "body": "{\"chave\": \"valor\"}",
                 "bodyType": "json",
-                "formData": [],
-                "auth": { "type": "inherit" }
-              }
-            },
-            {
-              "id": "req-fixture-003",
-              "name": "PUT Update",
-              "type": "request",
-              "children": [],
-              "folderConfig": null,
-              "request": {
-                "id": "req-fixture-003",
-                "name": "PUT Update",
-                "method": "PUT",
-                "url": "https://postman-echo.com/put",
-                "headers": [],
-                "params": [],
-                "pathParams": [],
-                "body": "",
-                "bodyType": "none",
                 "formData": [],
                 "auth": { "type": "inherit" }
               }

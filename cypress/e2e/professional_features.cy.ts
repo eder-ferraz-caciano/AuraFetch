@@ -136,4 +136,47 @@ describe('AuraFetch - Premium Features E2E', () => {
         cy.get('.tab').contains('Console / Timestamps').click();
         cy.get('.console-panel', { timeout: 15000 }).should('contain', 'REQUISIÇÃO');
     });
+
+  // ────────────────────────────────────────────
+  // 8. CODE SNIPPETS
+  // ────────────────────────────────────────────
+  it('Deve gerar Code Snippet com método e URL corretos (cURL)', () => {
+    cy.get('.method-select').select('POST');
+    cy.get('input[placeholder="{{base_url}}/api/..."]').clear().type('https://api.exemplo.com/dados', { parseSpecialCharSequences: false });
+    cy.get('button[title="Gerar Snippet de Código"]').click();
+    cy.get('.modal-overlay').should('be.visible');
+    cy.get('.modal-content pre').should('contain', 'POST').and('contain', 'api.exemplo.com/dados');
+    cy.get('.modal-overlay').click({ force: true });
+  });
+
+  it('Deve gerar snippet fetch válido', () => {
+    cy.get('input[placeholder="{{base_url}}/api/..."]').clear().type('https://api.exemplo.com/lista', { parseSpecialCharSequences: false });
+    cy.get('button[title="Gerar Snippet de Código"]').click();
+    cy.get('.modal-content .select-input').select('fetch');
+    cy.get('.modal-content pre').should('contain', 'fetch(').and('contain', 'api.exemplo.com/lista');
+    cy.get('.modal-overlay').click({ force: true });
+  });
+
+  it('Deve gerar snippet axios com headers configurados', () => {
+    cy.get('.tab').contains('Headers Custo.').click();
+    cy.contains('button', 'Nova Linha de Header').click();
+    cy.get('input[placeholder="Ex: Content-Type"]').last().clear().type('X-App-Token');
+    cy.get('input[placeholder*="Ex: application/json"]').last().clear().type('token_ax_123');
+    cy.get('input[placeholder="{{base_url}}/api/..."]').clear().type('https://api.exemplo.com/post', { parseSpecialCharSequences: false });
+    cy.get('button[title="Gerar Snippet de Código"]').click();
+    cy.get('.modal-content .select-input').select('axios');
+    cy.get('.modal-content pre').should('contain', 'axios(').and('contain', 'X-App-Token');
+    cy.get('.modal-overlay').click({ force: true });
+  });
+
+  it('Snippet atualiza quando URL muda', () => {
+    cy.get('button[title="Gerar Snippet de Código"]').click();
+    cy.get('.modal-overlay').should('be.visible');
+    cy.get('.modal-content pre').invoke('text').then(textBefore => {
+      cy.get('.modal-overlay').click({ force: true });
+      cy.get('input[placeholder="{{base_url}}/api/..."]').clear().type('https://novo.servidor.com/endpoint', { parseSpecialCharSequences: false });
+      cy.get('button[title="Gerar Snippet de Código"]').click();
+      cy.get('.modal-content pre').invoke('text').should('include', 'novo.servidor.com');
+    });
+  });
 });
