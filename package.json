@@ -1,7 +1,7 @@
 {
   "name": "aurafetch",
   "private": true,
-  "version": "1.3.1",
+  "version": "1.3.2",
   "description": "AuraFetch — A modern, lightweight, open-source API client for Desktop. A fast alternative to Postman and Insomnia built with Tauri, React and TypeScript. Supports REST API testing, environment variables, pre-request scripts, and more.",
   "author": "Eder Ferraz Caciano",
   "license": "MIT",
