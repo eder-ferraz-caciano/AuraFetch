@@ -16,28 +16,7 @@ import { save as tauriSave, open as tauriOpen } from '@tauri-apps/plugin-dialog'
 import { writeFile as tauriWriteFile } from '@tauri-apps/plugin-fs';
 import { isTauri } from '@tauri-apps/api/core';
 import { safeFetch, readFileWithSizeGuard, MAX_FILE_UPLOAD_MB, MAX_FILE_UPLOAD_BYTES } from './utils/safeFetch';
-
-export class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { hasError: boolean, error: Error | null }> {
-  constructor(props: { children: React.ReactNode }) {
-    super(props);
-    this.state = { hasError: false, error: null };
-  }
-  static getDerivedStateFromError(error: Error) {
-    return { hasError: true, error };
-  }
-  render() {
-    if (this.state.hasError) {
-      return (
-        <div style={{ padding: '40px', color: 'var(--text-primary)', textAlign: 'center' }}>
-          <h2>Algo deu errado (Erro Renderização).</h2>
-          <p style={{ color: 'var(--danger)' }}>{this.state.error?.message}</p>
-          <button className="btn btn-primary" onClick={() => window.location.reload()}>Recarregar App</button>
-        </div>
-      );
-    }
-    return this.props.children;
-  }
-}
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 import type { HttpMethod, AuthType, RequestHeader, EnvVar, Environment, AuthConfig, RequestBodyType, FormDataField, RequestModel, SavedResponse, CollectionNode, LogEntry, LegacyWorkspace, HistoryEntry } from './types';
 
