@@ -32,3 +32,18 @@ cypress_final*.txt
 
 # Git worktrees
 .worktrees/
+
+# Claude Code
+.claude/
+
+# Backup files
+src/App.before_removal.tsx
+src/App.tsx.backup2
+src/App.tsx.bak
+src/App.tsx.original
+src/App.tsx.task5c.backup
+src/components/devtools/tools/JWTGenerator.tsx
+
+# Test data
+test-*.json
+test_output.txt

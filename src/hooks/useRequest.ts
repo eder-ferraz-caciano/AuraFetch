@@ -3,7 +3,7 @@ import { isTauri } from '@tauri-apps/api/core';
 import { useRequestContext } from '../context/RequestContext';
 import { useEnvironment } from './useEnvironment';
 import { useWebSocket } from './useWebSocket';
-import { safeFetch, readFileWithSizeGuard, MAX_FILE_UPLOAD_MB, MAX_FILE_UPLOAD_BYTES } from '../utils/safeFetch';
+import { safeFetch, readFileWithSizeGuard, arrayBufferToBase64, base64ToUint8Array, MAX_FILE_UPLOAD_MB, MAX_FILE_UPLOAD_BYTES } from '../utils/safeFetch';
 import { save as tauriSave } from '@tauri-apps/plugin-dialog';
 import { writeFile as tauriWriteFile } from '@tauri-apps/plugin-fs';
 import type { RequestModel, AuthConfig, RequestHeader, SavedResponse, CollectionNode, HistoryEntry, LogEntry } from '../types';
@@ -287,11 +287,11 @@ aurafetch.log("Token renovado e salvo na pasta!");`;
     const activeEnv = getActiveEnvironment(nodeId);
 
     if (activeEnv) {
-      addLog('info', `🌍 [Ambiente: ${activeEnv.name}] resolvendo variáveis para o disparo...`);
+      addLog('info', `[Ambiente: ${activeEnv.name}] resolvendo variaveis para o disparo...`);
     } else if (parentWs) {
-      addLog('warn', `⚠️ [Aviso] Nenhum Ambiente ATIVO selecionado no Workspace "${parentWs.name}". Variáveis do ambiente não serão resolvidas.`);
+      addLog('warn', `[Aviso] Nenhum Ambiente ativo no Workspace "${parentWs.name}". Variaveis do ambiente nao serao resolvidas.`);
     } else {
-      addLog('error', `❌ [Erro de Escopo] Não foi possível localizar o Workspace para a requisição selecionada. As variáveis não serão carregadas.`);
+      addLog('error', `[Erro de Escopo] Nao foi possivel localizar o Workspace para a requisicao selecionada.`);
     }
 
     let targetUrl = applyVariables(activeReq.url, nodeId);
@@ -401,6 +401,11 @@ aurafetch.log("Token renovado e salvo na pasta!");`;
               throw new Error(`Arquivo "${activeReq.webBinaryFile.name}" excede o limite de ${MAX_FILE_UPLOAD_MB}MB`);
             }
             bytes = new Uint8Array(await activeReq.webBinaryFile.arrayBuffer()) as Uint8Array<ArrayBuffer>;
+          } else if (!isTauri() && !activeReq.webBinaryFile) {
+            throw new Error(
+              `Arquivo "${activeReq.binaryFile.name}" precisa ser selecionado novamente. ` +
+              `Clique em "Alterar Arquivo" para re-selecionar.`
+            );
           } else {
             bytes = await readFileWithSizeGuard(activeReq.binaryFile.path, activeReq.binaryFile.name);
           }
@@ -422,6 +427,11 @@ aurafetch.log("Token renovado e salvo na pasta!");`;
                   throw new Error(`Arquivo "${f.webFile.name}" excede o limite de ${MAX_FILE_UPLOAD_MB}MB`);
                 }
                 bytes = new Uint8Array(await f.webFile.arrayBuffer()) as Uint8Array<ArrayBuffer>;
+              } else if (!isTauri() && !f.webFile) {
+                throw new Error(
+                  `Arquivo "${f.fileInfo.name}" precisa ser selecionado novamente. ` +
+                  `Clique em "Trocar" para re-selecionar.`
+                );
               } else {
                 bytes = await readFileWithSizeGuard(f.fileInfo.path, f.fileInfo.name);
               }
@@ -469,19 +479,13 @@ aurafetch.log("Token renovado e salvo na pasta!");`;
 
       if (contentType.includes('image/')) {
         const buffer = await res.arrayBuffer();
-        const b64 = btoa(
-          new Uint8Array(buffer)
-            .reduce((acc, byte) => acc + String.fromCharCode(byte), '')
-        );
-        data = `data:${contentType};base64,${b64}`;
+        const b64 = arrayBufferToBase64(buffer);
+        data = `data:${contentType.split(';')[0]};base64,${b64}`;
         responseType = 'image';
       } else if (contentType.includes('application/pdf')) {
         const buffer = await res.arrayBuffer();
-        const b64 = btoa(
-          new Uint8Array(buffer)
-            .reduce((acc, byte) => acc + String.fromCharCode(byte), '')
-        );
-        data = `data:${contentType};base64,${b64}`;
+        const b64 = arrayBufferToBase64(buffer);
+        data = `data:application/pdf;base64,${b64}`;
         responseType = 'pdf';
       } else {
         const isText = contentType.includes('text/') ||
@@ -490,7 +494,10 @@ aurafetch.log("Token renovado e salvo na pasta!");`;
           contentType.includes('application/javascript');
 
         if (!isText && (contentType.includes('application/') || contentType.includes('font/'))) {
-          data = "[Arquivo Binário]";
+          const buffer = await res.arrayBuffer();
+          const b64 = arrayBufferToBase64(buffer);
+          const mime = contentType.split(';')[0] || 'application/octet-stream';
+          data = `data:${mime};base64,${b64}`;
           responseType = 'binary';
         } else {
           const text = await res.text();
@@ -599,7 +606,7 @@ aurafetch.log("Token renovado e salvo na pasta!");`;
         Note: "Possible CORS, DNS issue, timeout, connection refused or manual abort."
       };
 
-      addLog('error', `❌ Falha no disparo. Erro: ${errData}`, errOutput);
+      addLog('error', `Falha no disparo. Erro: ${errData}`, errOutput);
     } finally {
       setLoading(false);
       abortControllerRef.current = null;
@@ -616,7 +623,7 @@ aurafetch.log("Token renovado e salvo na pasta!");`;
     if (!node || node.type !== 'folder' || !node.folderConfig?.setupScript) return;
 
     setLoading(true);
-    addLog('info', `⚙️ Rodando Script Livre da pasta...`);
+    addLog('info', `Executando script da pasta...`);
     setActiveResTab('console');
 
     try {
@@ -625,7 +632,7 @@ aurafetch.log("Token renovado e salvo na pasta!");`;
       const aurafetchCtx = {
         setEnv: (key: string, value: any) => {
           if (value === undefined || value === null) {
-            addLog('error', `⚠️ [aurafetch] Tentativa de salvar '${key}' com valor nulo ou indefinido! Verifique a resposta da API.`);
+            addLog('error', `[aurafetch] Tentativa de salvar '${key}' com valor nulo ou indefinido.`);
             return;
           }
           const finalVal = String(value);
@@ -647,19 +654,19 @@ aurafetch.log("Token renovado e salvo na pasta!");`;
                 }
               };
             });
-            addLog('success', `🧩 [aurafetch] Variável de Ambiente '${key}' salva! (Valor: ${finalVal.substring(0, 10)}...)`);
+            addLog('success', `[aurafetch] Variavel de Ambiente '${key}' salva (${finalVal.substring(0, 10)}...)`);
           } else {
             setGlobalVariables((globals: any[]) => {
               const exists = globals.find((v: any) => v.key === key);
               if (exists) return globals.map((v: any) => v.key === key ? { ...v, value: finalVal } : v);
               return [...globals, { id: uuidv4(), key, value: finalVal }];
             });
-            addLog('success', `🧩 [aurafetch] Variável Global '${key}' salva!`);
+            addLog('success', `[aurafetch] Variavel Global '${key}' salva`);
           }
         },
         setVar: (key: string, value: any) => {
           if (value === undefined || value === null) {
-            addLog('error', `⚠️ [aurafetch] Tentativa de salvar '${key}' na PASTA com valor nulo ou indefinido!`);
+            addLog('error', `[aurafetch] Tentativa de salvar '${key}' na pasta com valor nulo ou indefinido.`);
             return;
           }
           const finalVal = String(value);
@@ -675,9 +682,9 @@ aurafetch.log("Token renovado e salvo na pasta!");`;
               folderConfig: { ...(folder.folderConfig || { auth: defaultFolderAuth, variables: [] }), variables: newVars }
             };
           });
-          addLog('success', `🧩 [aurafetch] Variável da Pasta '${key}' setada para: ${finalVal.substring(0, 10)}...`);
+          addLog('success', `[aurafetch] Variavel da Pasta '${key}' = ${finalVal.substring(0, 10)}...`);
         },
-        log: (msg: any) => addLog('log', `📝 [aurafetch] ${typeof msg === 'object' ? JSON.stringify(msg, null, 2) : msg}`)
+        log: (msg: any) => addLog('log', `[aurafetch] ${typeof msg === 'object' ? JSON.stringify(msg, null, 2) : msg}`)
       };
 
       const customFetch = async (url: string, options?: RequestInit) => {
@@ -694,7 +701,7 @@ aurafetch.log("Token renovado e salvo na pasta!");`;
           finalOpts.body = applyVariables(finalOpts.body, node.id);
         }
 
-        addLog('info', `🌐 [fetch] Chamada externa: ${finalUrl}`, {
+        addLog('info', `[fetch] Chamada externa: ${finalUrl}`, {
           method: finalOpts.method || 'GET',
           headers: finalOpts.headers,
           body: finalOpts.body
@@ -707,7 +714,7 @@ aurafetch.log("Token renovado e salvo na pasta!");`;
           try { parsed = JSON.parse(txt); } catch { }
 
           const statusLog = res.status >= 200 && res.status < 300 ? 'success' : 'warn';
-          addLog(statusLog, `🌐 [fetch] Resposta: ${res.status} ${res.statusText}`, parsed);
+          addLog(statusLog, `[fetch] Resposta: ${res.status} ${res.statusText}`, parsed);
 
           return {
             ...res,
@@ -715,7 +722,7 @@ aurafetch.log("Token renovado e salvo na pasta!");`;
             json: async () => typeof parsed === 'string' ? JSON.parse(parsed) : parsed
           } as any;
         } catch (e: any) {
-          addLog('error', `❌ [fetch] Falha na rede: ${e.message}`);
+          addLog('error', `[fetch] Falha na rede: ${e.message}`);
           throw e;
         }
       };
@@ -725,10 +732,10 @@ aurafetch.log("Token renovado e salvo na pasta!");`;
 
       await fn(aurafetchCtx, customFetch, customFetch);
 
-      addLog('success', `✅ Script finalizado! Variáveis injetadas com sucesso.`);
+      addLog('success', `Script finalizado. Variaveis injetadas com sucesso.`);
     } catch (err: any) {
       const errorMsg = err?.message || (typeof err === 'string' ? err : JSON.stringify(err)) || 'Erro interno desconhecido';
-      addLog('error', `❌ Falha no Script: ${errorMsg}`);
+      addLog('error', `Falha no Script: ${errorMsg}`);
     } finally {
       setLoading(false);
     }
@@ -759,55 +766,84 @@ aurafetch.log("Token renovado e salvo na pasta!");`;
     if (!activeResponse) return;
     try {
       const { data, type, contentType } = activeResponse;
-      let extension = 'txt';
-      if (type === 'json') extension = 'json';
-      else if (type === 'image') {
-        const subType = contentType?.split('/')[1]?.split(';')[0] || 'png';
-        extension = subType;
+      const isBinaryDataUrl = typeof data === 'string' && data.startsWith('data:');
+
+      const mimeToExt: Record<string, string> = {
+        'image/png': 'png', 'image/jpeg': 'jpg', 'image/gif': 'gif',
+        'image/webp': 'webp', 'image/svg+xml': 'svg', 'image/bmp': 'bmp',
+        'image/tiff': 'tiff', 'image/x-icon': 'ico', 'image/avif': 'avif',
+        'application/pdf': 'pdf', 'application/json': 'json',
+        'application/xml': 'xml', 'text/xml': 'xml',
+        'application/zip': 'zip', 'application/gzip': 'gz',
+        'application/x-gzip': 'gz', 'application/x-tar': 'tar',
+        'application/x-7z-compressed': '7z', 'application/x-rar-compressed': 'rar',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': 'xlsx',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document': 'docx',
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation': 'pptx',
+        'application/vnd.ms-excel': 'xls', 'application/msword': 'doc',
+        'application/vnd.ms-powerpoint': 'ppt',
+        'text/html': 'html', 'text/css': 'css', 'text/javascript': 'js',
+        'text/csv': 'csv', 'text/plain': 'txt',
+        'application/javascript': 'js', 'application/typescript': 'ts',
+        'application/wasm': 'wasm',
+        'audio/mpeg': 'mp3', 'audio/wav': 'wav', 'audio/ogg': 'ogg',
+        'video/mp4': 'mp4', 'video/webm': 'webm',
+        'font/woff': 'woff', 'font/woff2': 'woff2', 'font/ttf': 'ttf', 'font/otf': 'otf',
+      };
+
+      const mime = contentType?.split(';')[0]?.trim().toLowerCase() || '';
+      let extension = mimeToExt[mime] || '';
+      if (!extension) {
+        if (type === 'json') extension = 'json';
+        else if (type === 'image') extension = 'png';
+        else if (type === 'pdf') extension = 'pdf';
+        else if (type === 'html') extension = 'html';
+        else if (type === 'binary') extension = 'bin';
+        else extension = 'txt';
       }
-      else if (type === 'pdf') extension = 'pdf';
-      else if (type === 'html') extension = 'html';
 
       const safeName = (activeReq?.name ?? 'response').replace(/[^a-z0-9]/gi, '_').toLowerCase();
+      const fileName = `response_${safeName}.${extension}`;
 
       if (!isTauri()) {
-        if (type === 'image' || type === 'pdf') {
+        if (isBinaryDataUrl) {
+          const b64 = (data as string).split(',')[1];
+          const bytes = base64ToUint8Array(b64);
+          const mime = contentType?.split(';')[0] || 'application/octet-stream';
+          const blob = new Blob([bytes.buffer as ArrayBuffer], { type: mime });
+          const url = URL.createObjectURL(blob);
           const a = document.createElement('a');
-          a.href = data as string;
-          a.download = `response_${safeName}.${extension}`;
+          a.href = url;
+          a.download = fileName;
           a.click();
+          URL.revokeObjectURL(url);
         } else {
           const content = typeof data === 'object' ? JSON.stringify(data, null, 2) : String(data);
-          downloadBlobWeb(content, `response_${safeName}.${extension}`, contentType || 'text/plain');
+          downloadBlobWeb(content, fileName, contentType || 'text/plain');
         }
-        addLog('success', `📂 Download iniciado.`);
+        addLog('success', `Download iniciado.`);
         return;
       }
 
       const filePath = await tauriSave({
         filters: [{ name: 'Arquivo de Resposta', extensions: [extension] }],
-        defaultPath: `response_${safeName}.${extension}`
+        defaultPath: fileName
       });
 
       if (filePath) {
-        if (type === 'image' || type === 'pdf') {
-          const b64Data = data.split(',')[1];
-          const binaryString = window.atob(b64Data);
-          const len = binaryString.length;
-          const bytes = new Uint8Array(len);
-          for (let i = 0; i < len; i++) {
-            bytes[i] = binaryString.charCodeAt(i);
-          }
+        if (isBinaryDataUrl) {
+          const b64Data = (data as string).split(',')[1];
+          const bytes = base64ToUint8Array(b64Data);
           await tauriWriteFile(filePath, bytes);
         } else {
-          const content = typeof data === 'object' ? JSON.stringify(data, null, 2) : data;
+          const content = typeof data === 'object' ? JSON.stringify(data, null, 2) : String(data);
           const encoder = new TextEncoder();
           await tauriWriteFile(filePath, encoder.encode(content));
         }
-        addLog('success', `📂 Arquivo salvo em: ${filePath}`);
+        addLog('success', `Arquivo salvo em: ${filePath}`);
       }
     } catch (err: any) {
-      addLog('error', `❌ Falha ao salvar arquivo: ${err.message}`);
+      addLog('error', `Falha ao salvar arquivo: ${err.message}`);
     }
   }, [activeResponse, activeReq, downloadBlobWeb, addLog]);
 

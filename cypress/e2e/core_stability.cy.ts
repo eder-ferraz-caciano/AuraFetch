@@ -40,11 +40,11 @@ describe('AuraFetch - Core Stability & Reliability E2E', () => {
         // Selecionar uma requisição e disparar com URL única
         cy.get('.sidebar-tree-container').contains('Listar Dados').click({ force: true });
         cy.get('input[placeholder="{{base_url}}/api/..."]').clear().type(`${POSTMAN_ECHO}/get?test=history`, { parseSpecialCharSequences: false });
-        cy.contains('button', 'Fazer Disparo').click({ force: true });
+        cy.contains('button', 'Enviar').click({ force: true });
         cy.get('.status-badge', { timeout: 25000 }).should('be.visible');
 
-        // Mudar para a aba de Histórico
-        cy.get('button').contains('Histórico').click();
+        // Mudar para a aba de Historico na sidebar
+        cy.contains('button', 'Historico').click();
         cy.get('.history-card').should('have.length.at.least', 1);
 
         // Clicar no histórico deve carregar a URL no input principal
@@ -57,15 +57,15 @@ describe('AuraFetch - Core Stability & Reliability E2E', () => {
     // ────────────────────────────────────────────
     it('Deve mostrar que a Requisição herda Auth da Pasta no UI', () => {
         cy.get('.sidebar-tree-container').contains('Meu Servidor/Projeto').click({ force: true });
-        cy.get('.tab').contains('Autenticação').click();
-        cy.get('select').first().select('bearer');
+        // Folder config abre na aba auth por padrão (sem .tab class)
+        cy.get('.select-input').first().select('bearer');
         cy.get('input[placeholder*="meu_token_jwt"]').type('TOKEN_TESTE', { parseSpecialCharSequences: false });
 
         cy.get('.sidebar-tree-container').contains('Listar Dados').click({ force: true });
-        cy.get('.tab').contains('Autenticação').click();
+        cy.get('.tab').contains('Auth').click();
 
         cy.get('.glass-panel select').should('have.value', 'inherit');
-        cy.contains('Esta requisição herda a autenticação da pasta pai').should('be.visible');
+        cy.contains('Herda autenticacao da pasta pai').should('be.visible');
     });
 
     // ────────────────────────────────────────────
@@ -80,7 +80,7 @@ describe('AuraFetch - Core Stability & Reliability E2E', () => {
         cy.get('.modal-overlay').should('be.visible');
         cy.contains('Confirmar Eliminação').should('be.visible');
 
-        cy.contains('button', 'Repensar').click();
+        cy.contains('button', 'Cancelar').click();
         cy.get('.modal-overlay').should('not.exist');
     });
 
@@ -91,14 +91,14 @@ describe('AuraFetch - Core Stability & Reliability E2E', () => {
     cy.intercept('GET', '**/get*', { body: { ok: true }, statusCode: 200 }).as('req');
     cy.get('.sidebar-tree-container').contains('Listar Dados').click({ force: true });
     cy.get('input[placeholder="{{base_url}}/api/..."]').clear().type('https://postman-echo.com/get?test=persist_hist', { parseSpecialCharSequences: false });
-    cy.contains('button', 'Fazer Disparo').click({ force: true });
+    cy.contains('button', 'Enviar').click({ force: true });
     cy.wait('@req');
     cy.get('.status-badge', { timeout: 15000 }).should('be.visible');
     cy.reload();
     cy.get('.app-title', { timeout: 30000 }).should('be.visible');
     // Selecionar um nó para ativar o histórico do workspace
     cy.get('.sidebar-tree-container').contains('Listar Dados').click({ force: true });
-    cy.get('button').contains('Histórico').click();
+    cy.contains('button', 'Historico').click();
     cy.get('.history-card').should('have.length.at.least', 1);
   });
 
@@ -110,10 +110,10 @@ describe('AuraFetch - Core Stability & Reliability E2E', () => {
     cy.get('.method-select').select('POST');
     cy.get('input[placeholder="{{base_url}}/api/..."]').clear().type('https://postman-echo.com/post?hist_restore=1', { parseSpecialCharSequences: false });
     cy.intercept('POST', '**/post*', { body: { ok: true }, statusCode: 200 }).as('postReq');
-    cy.contains('button', 'Fazer Disparo').click({ force: true });
+    cy.contains('button', 'Enviar').click({ force: true });
     cy.wait('@postReq');
     cy.get('.status-badge', { timeout: 15000 }).should('be.visible');
-    cy.get('button').contains('Histórico').click();
+    cy.contains('button', 'Historico').click();
     cy.get('.history-card').first().click();
     cy.get('input[placeholder="{{base_url}}/api/..."]').should('have.value', 'https://postman-echo.com/post?hist_restore=1');
   });

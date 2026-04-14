@@ -18,7 +18,7 @@ describe('AuraFetch - Queries & Params Synchronization E2E', () => {
             .clear()
             .type(`${POSTMAN_ECHO}/get`, { parseSpecialCharSequences: false });
 
-        cy.get('.tab').contains('Queries').click();
+        cy.get('.tab').contains('Query').click();
 
         // Adicionar nova query (renderVarTable usa botão "Adicionar Linha")
         cy.contains('button', 'Adicionar Linha').first().click();
@@ -33,7 +33,7 @@ describe('AuraFetch - Queries & Params Synchronization E2E', () => {
     });
 
     it('Deve preencher a tabela ao digitar Query Params na URL', () => {
-        cy.get('.tab').contains('Queries').click();
+        cy.get('.tab').contains('Query').click();
 
         // Digitar diretamente na barra de URL
         cy.get('input[placeholder="{{base_url}}/api/..."]').clear().type(`${POSTMAN_ECHO}/get?q=tauri&lang=pt`, { parseSpecialCharSequences: false });
@@ -52,7 +52,7 @@ describe('AuraFetch - Queries & Params Synchronization E2E', () => {
     it('Deve detectar Path Params (:id) na URL e criar na tabela', () => {
         cy.get('input[placeholder="{{base_url}}/api/..."]').clear().type(`${POSTMAN_ECHO}/users/:id/details`, { parseSpecialCharSequences: false });
 
-        cy.get('.tab').contains('Params (URL)').click();
+        cy.get('.tab').contains('Params').click();
 
         // Verificar se a chave "id" foi criada na tabela de Params
         cy.get('input[placeholder="Chave"]').last().should('have.value', 'id');

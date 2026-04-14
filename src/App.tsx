@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { useRequestContext } from './context/RequestContext';
 import { useCollection } from './hooks/useCollection';
 import { useEnvironment } from './hooks/useEnvironment';
@@ -6,8 +6,8 @@ import { useRequest } from './hooks/useRequest';
 import { useWebSocket } from './hooks/useWebSocket';
 import {
   Folder, FileText, Plus, Download, Upload,
-  Play, Square, Trash2, Send, Clock, Edit2, Terminal, AlertTriangle,
-  Copy, Check, Globe, Layers, Database
+  Play, Square, Trash2, Send, Clock, Terminal,
+  Copy, Check, Globe, Layers, Database, BarChart3, Settings, Shield, Code, Network
 } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import CodeMirror from '@uiw/react-codemirror';
@@ -17,8 +17,9 @@ import { graphql } from 'cm6-graphql';
 import { oneDark } from '@codemirror/theme-one-dark';
 import { open as tauriOpen } from '@tauri-apps/plugin-dialog';
 import { isTauri } from '@tauri-apps/api/core';
-import { MAX_FILE_UPLOAD_MB, MAX_FILE_UPLOAD_BYTES } from './utils/safeFetch';
+import { MAX_FILE_UPLOAD_MB, MAX_FILE_UPLOAD_BYTES, base64ToUint8Array } from './utils/safeFetch';
 import { Sidebar } from './components/layout/Sidebar';
+import { DevToolsPanel } from './components/devtools/DevToolsPanel';
 
 import type { HttpMethod, AuthType, RequestHeader, AuthConfig, RequestBodyType, RequestModel, SavedResponse, CollectionNode, LogEntry } from './types';
 
@@ -186,10 +187,12 @@ export default function App() {
     removeEnv: removeEnvHook,
   } = useEnvironment();
 
+  // Mode (HTTP Client | DevTools)
+  const [mode, setMode] = useState<'http' | 'devtools'>('http');
 
   // Tabs
   const [activeReqTab, setActiveReqTab] = useState<'auth' | 'headers' | 'body' | 'params' | 'queries'>('auth');
-  const [activeFolderSettingTab, setActiveFolderSettingTab] = useState<'auth' | 'vars' | 'headers'>('auth');
+  const [activeFolderSettingTab, setActiveFolderSettingTab] = useState<'auth' | 'vars' | 'headers' | 'script'>('auth');
   const [activeWorkspaceTab, setActiveWorkspaceTab] = useState<'environments' | 'globals' | 'summary'>('environments');
   const [activeResTab, setActiveResTab] = useState<'response' | 'headers' | 'console'>('response');
 
@@ -310,6 +313,31 @@ export default function App() {
 
   const activeNode = getActiveNode(collection, activeNodeId);
   const activeReq = activeNode?.type === 'request' ? activeNode.request! : null;
+
+  // Convert data-URL responses to Blob URLs for PDF/binary iframe preview.
+  // Data URLs fail in WebView2/some browsers. Blob URLs are universally supported.
+  const responseBlobUrl = useMemo(() => {
+    if (!activeResponse) return null;
+    const { data, type } = activeResponse;
+    if ((type === 'pdf' || type === 'image' || type === 'binary') && typeof data === 'string' && data.startsWith('data:')) {
+      try {
+        const [header, b64] = data.split(',');
+        const mime = header.split(':')[1]?.split(';')[0] || 'application/octet-stream';
+        const bytes = base64ToUint8Array(b64);
+        return URL.createObjectURL(new Blob([bytes.buffer as ArrayBuffer], { type: mime }));
+      } catch {
+        return null;
+      }
+    }
+    return null;
+  }, [activeResponse]);
+
+  // Revoke previous Blob URL on change
+  useEffect(() => {
+    return () => {
+      if (responseBlobUrl) URL.revokeObjectURL(responseBlobUrl);
+    };
+  }, [responseBlobUrl]);
 
   const handleActiveReqChange = (updates: Partial<RequestModel> & { savedResponse?: SavedResponse | null; savedLogs?: LogEntry[] }) => {
     if (!activeNodeId) return;
@@ -453,7 +481,12 @@ export default function App() {
       else if (resolvedAuth.type === 'apikey' && resolvedAuth.apiKeyKey && resolvedAuth.apiKeyValue) {
         const k = applyVariables(resolvedAuth.apiKeyKey, req.id);
         const v = applyVariables(resolvedAuth.apiKeyValue, req.id);
-        if (resolvedAuth.apiKeyIn === 'header') fetchHeaders[k] = v;
+        if (resolvedAuth.apiKeyIn === 'header') {
+          fetchHeaders[k] = v;
+        } else {
+          const sep = targetUrl.includes('?') ? '&' : '?';
+          targetUrl += `${sep}${encodeURIComponent(k)}=${encodeURIComponent(v)}`;
+        }
       }
     }
 
@@ -517,16 +550,16 @@ export default function App() {
             path: selected
           }
         });
-        addLog('info', `📎 Arquivo binário selecionado: ${selected}`);
+        addLog('info', `Arquivo binario selecionado: ${selected}`);
       }
     } catch (err: any) {
-      addLog('error', `❌ Erro ao selecionar arquivo: ${err.message}`);
+      addLog('error', `Erro ao selecionar arquivo: ${err.message}`);
     }
   };
 
   const pickFormDataFile = async (fieldId: string) => {
     if (!isTauri()) {
-      addLog('error', '❌ Seleção de arquivo para form-data disponível apenas na versão desktop.');
+      addLog('error', 'Selecao de arquivo para form-data disponivel apenas na versao desktop.');
       return;
     }
     try {
@@ -536,10 +569,10 @@ export default function App() {
           f.id === fieldId ? { ...f, fileInfo: { name: selected.split(/[\/\\]/).pop() || 'file', path: selected } } : f
         );
         handleActiveReqChange({ formData: newFormData });
-        addLog('info', `📂 Arquivo para form-data selecionado: ${selected}`);
+        addLog('info', `Arquivo para form-data selecionado: ${selected}`);
       }
     } catch (err: any) {
-      addLog('error', `❌ Erro ao selecionar arquivo: ${err.message}`);
+      addLog('error', `Erro ao selecionar arquivo: ${err.message}`);
     }
   };
 
@@ -800,7 +833,7 @@ export default function App() {
             const file = e.target.files?.[0];
             if (!file) return;
             if (file.size > MAX_FILE_UPLOAD_BYTES) {
-              addLog('error', `❌ Arquivo "${file.name}" excede o limite de ${MAX_FILE_UPLOAD_MB}MB. Selecione um arquivo menor.`);
+              addLog('error', `Arquivo "${file.name}" excede o limite de ${MAX_FILE_UPLOAD_MB}MB. Selecione um arquivo menor.`);
               return;
             }
             handleActiveReqChange({
@@ -928,13 +961,17 @@ export default function App() {
 
       {/* Sidebar */}
       <Sidebar
+        mode={mode}
+        onModeChange={setMode}
         exportCollection={exportCollection}
         importCollection={importCollection}
       />
 
       {/* Main Content */}
       <main className="main-content">
-        {!activeNode ? (
+        {mode === 'devtools' ? (
+          <DevToolsPanel />
+        ) : !activeNode ? (
           /* WELCOME SCREEN */
           <div className="fade-in" style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
             <img src="/aurafetch_logo.png" alt="AuraFetch Logo" width={80} style={{ borderRadius: '16px', marginBottom: '16px', boxShadow: '0 8px 32px rgba(0,0,0,0.3)' }} />
@@ -972,9 +1009,6 @@ export default function App() {
                   </button>
                 </div>
               </div>
-              <p style={{ color: 'var(--text-muted)', margin: 0, fontSize: '13px' }}>
-                Gerencie ambientes, variáveis e configurações deste workspace.
-              </p>
             </div>
 
             {/* Workspace Tabs */}
@@ -1042,10 +1076,16 @@ export default function App() {
                     })}
 
                     {(activeNode.workspaceConfig?.environments || []).length === 0 && (
-                      <div style={{ padding: '20px 14px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px' }}>
-                        Nenhum ambiente.
-                        <br />
-                        Clique em <strong>+</strong> acima.
+                      <div style={{ padding: '30px 14px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px' }}>
+                        <div style={{
+                          width: '36px', height: '36px', borderRadius: '50%',
+                          backgroundColor: 'rgba(0,0,0,0.15)', border: '2px dashed var(--border-subtle)',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          margin: '0 auto 8px',
+                        }}>
+                          <Layers size={16} style={{ opacity: 0.35 }} />
+                        </div>
+                        Nenhum ambiente criado.
                       </div>
                     )}
                   </div>
@@ -1053,9 +1093,16 @@ export default function App() {
                   {/* Right: env editor */}
                   <div className="ws-env-editor">
                     {!editingEnvId || !activeNode.workspaceConfig?.environments.find(e => e.id === editingEnvId) ? (
-                      <div style={{ color: 'var(--text-muted)', textAlign: 'center', marginTop: '60px', fontSize: '13px' }}>
-                        <Layers size={32} style={{ opacity: 0.1, marginBottom: '12px' }} />
-                        <p>Selecione um ambiente na lista ao lado para editar suas variáveis.</p>
+                      <div style={{ color: 'var(--text-muted)', textAlign: 'center', marginTop: '60px', fontSize: '12px' }}>
+                        <div style={{
+                          width: '48px', height: '48px', borderRadius: '50%',
+                          backgroundColor: 'rgba(0,0,0,0.15)', border: '2px dashed var(--border-subtle)',
+                          display: 'flex', alignItems: 'center', justifyContent: 'center',
+                          margin: '0 auto 10px',
+                        }}>
+                          <Layers size={20} style={{ opacity: 0.35 }} />
+                        </div>
+                        <p style={{ margin: 0 }}>Selecione um ambiente para editar variaveis.</p>
                       </div>
                     ) : (() => {
                       const env = activeNode.workspaceConfig!.environments.find(e => e.id === editingEnvId)!;
@@ -1124,73 +1171,43 @@ export default function App() {
               {activeWorkspaceTab === 'summary' && (
                 <div className="fade-in" style={{ padding: '24px 32px', flex: 1, overflowY: 'auto' }}>
                   <div className="glass-panel" style={{ padding: '20px', marginBottom: '20px' }}>
-                    <h3 style={{ marginBottom: '16px', fontSize: '16px', color: 'var(--text-primary)' }}>📊 Resumo do Workspace</h3>
-                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
-                      <div style={{ padding: '20px', background: 'rgba(0,0,0,0.2)', borderRadius: '8px', textAlign: 'center' }}>
-                        <div style={{ fontSize: '28px', fontWeight: 700, color: 'var(--accent-primary)' }}>{activeNode.children?.length || 0}</div>
-                        <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '6px' }}>Itens na Raiz</div>
-                      </div>
-                      <div style={{ padding: '20px', background: 'rgba(0,0,0,0.2)', borderRadius: '8px', textAlign: 'center' }}>
-                        <div style={{ fontSize: '28px', fontWeight: 700, color: 'var(--success)' }}>{activeNode.workspaceConfig?.environments.length || 0}</div>
-                        <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '6px' }}>Ambientes</div>
-                      </div>
-                      <div style={{ padding: '20px', background: 'rgba(0,0,0,0.2)', borderRadius: '8px', textAlign: 'center' }}>
-                        <div style={{ fontSize: '28px', fontWeight: 700, color: 'var(--text-primary)' }}>{activeNode.workspaceConfig?.history?.length || 0}</div>
-                        <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '6px' }}>No Histórico</div>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="glass-panel" style={{ padding: '20px', marginBottom: '20px' }}>
-                    <h3 style={{ marginBottom: '16px', fontSize: '16px', color: 'var(--text-primary)' }}>⚙️ Configurações Globais do App</h3>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', maxWidth: '400px' }}>
-                      <div>
-                        <label style={{ display: 'block', marginBottom: '8px', fontSize: '13px', color: 'var(--text-secondary)' }}>Timeout de Requisições (segundos)</label>
-                        <input
-                          type="number"
-                          className="text-input"
-                          value={reqTimeoutMs / 1000}
-                          onChange={e => setReqTimeoutMs(Math.max(1, Number(e.target.value)) * 1000)}
-                          style={{ width: '100%' }}
-                        />
-                        <p style={{ marginTop: '8px', fontSize: '11px', color: 'var(--text-muted)' }}>
-                          Tempo máximo de espera antes de cancelar automaticamente a requisição.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Active Env Info */}
-                  <div className="glass-panel" style={{ padding: '20px' }}>
-                    <h3 style={{ marginBottom: '12px', fontSize: '16px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <Layers size={16} /> Ambiente Ativo
+                    <h3 style={{ marginBottom: '16px', fontSize: '16px', color: 'var(--text-primary)', display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <BarChart3 size={16} className="text-accent" /> Resumo do Workspace
                     </h3>
-                    {(() => {
-                      const wsActiveEnv = activeNode.workspaceConfig?.environments.find(e => e.id === activeNode.workspaceConfig?.activeEnvironmentId);
-                      if (!wsActiveEnv) return (
-                        <p style={{ color: 'var(--text-muted)', fontSize: '13px' }}>Nenhum ambiente ativo. Vá para a aba "Ambientes" e ative um.</p>
-                      );
-                      return (
-                        <div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px' }}>
-                            <div style={{ width: '10px', height: '10px', borderRadius: '50%', background: 'var(--success)', boxShadow: '0 0 8px var(--success)' }} />
-                            <span style={{ fontSize: '15px', fontWeight: 600, color: 'var(--text-primary)' }}>{wsActiveEnv.name}</span>
-                            <span className="badge" style={{ fontSize: '10px' }}>{wsActiveEnv.variables.length} vars</span>
+                    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '12px' }}>
+                      {[
+                        { value: activeNode.children?.length || 0, label: 'Itens na Raiz', color: 'var(--accent-primary)' },
+                        { value: activeNode.workspaceConfig?.environments.length || 0, label: 'Ambientes', color: 'var(--success)' },
+                        { value: activeNode.workspaceConfig?.history?.length || 0, label: 'No Historico', color: 'var(--text-muted)' },
+                      ].map(stat => (
+                        <div key={stat.label} style={{
+                          padding: '16px', background: 'rgba(0,0,0,0.15)',
+                          border: '1px solid var(--border-subtle)', borderRadius: '8px', textAlign: 'center',
+                        }}>
+                          <div style={{ fontSize: '9px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: '6px' }}>
+                            {stat.label}
                           </div>
-                          <div style={{ background: 'rgba(0,0,0,0.2)', borderRadius: '6px', padding: '12px', fontFamily: 'var(--font-mono)', fontSize: '12px' }}>
-                            {wsActiveEnv.variables.length === 0 ? (
-                              <span style={{ color: 'var(--text-muted)' }}>Nenhuma variável definida neste ambiente.</span>
-                            ) : wsActiveEnv.variables.map(v => (
-                              <div key={v.id} style={{ display: 'flex', gap: '8px', marginBottom: '4px' }}>
-                                <span style={{ color: 'var(--accent-primary)' }}>{v.key}</span>
-                                <span style={{ color: 'var(--text-muted)' }}>=</span>
-                                <span style={{ color: 'var(--success)' }}>{v.value}</span>
-                              </div>
-                            ))}
+                          <div style={{ fontSize: '24px', fontWeight: 700, fontFamily: 'monospace', color: stat.color }}>
+                            {stat.value}
                           </div>
                         </div>
-                      );
-                    })()}
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="glass-panel" style={{ padding: '16px 20px', marginBottom: '20px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                      <Settings size={14} className="text-accent" style={{ flexShrink: 0 }} />
+                      <span style={{ fontSize: '13px', color: 'var(--text-secondary)', flex: 1 }}>Timeout de requisicoes</span>
+                      <input
+                        type="number"
+                        className="text-input"
+                        value={reqTimeoutMs / 1000}
+                        onChange={e => setReqTimeoutMs(Math.max(1, Number(e.target.value)) * 1000)}
+                        style={{ width: '70px', textAlign: 'center', fontSize: '13px', padding: '4px 8px' }}
+                      />
+                      <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>seg</span>
+                    </div>
                   </div>
                 </div>
               )}
@@ -1198,128 +1215,207 @@ export default function App() {
           </div>
         ) : activeNode.type === 'folder' ? (
           /* FOLDER CONFIGURATION */
-          <div className="fade-in" style={{ padding: '24px 32px', flex: 1, overflowY: 'auto' }}>
-            <h1 style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '12px', letterSpacing: '-0.5px', fontSize: '24px' }}>
-              <Folder size={24} className="text-accent" style={{ opacity: 0.9 }} /> {activeNode.name}
-            </h1>
-            <p style={{ color: 'var(--text-secondary)', marginBottom: '24px', fontSize: '14px', maxWidth: '800px', lineHeight: 1.5 }}>
-              Agrupador de Rotas: Defina <b>Autenticação</b> e <b>Variáveis Locais</b> que serão herdadas por todas as requisições filhas desta pasta.
-            </p>
-
-            <div className="folder-tabs-container glass-panel" style={{ padding: '0', marginBottom: '20px', overflow: 'hidden' }}>
-              <div className="tabs folder-settings-header" style={{ borderBottom: '1px solid var(--border-subtle)', background: 'rgba(0,0,0,0.1)' }}>
-                <div
-                  className={`tab ${activeFolderSettingTab === 'auth' ? 'active' : ''}`}
-                  onClick={() => setActiveFolderSettingTab('auth')}
-                  style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 20px', fontSize: '13px' }}
-                >
-                  <Edit2 size={14} className="text-success" /> Autenticação Herdável
-                </div>
-                <div
-                  className={`tab ${activeFolderSettingTab === 'headers' ? 'active' : ''}`}
-                  onClick={() => setActiveFolderSettingTab('headers')}
-                  style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 20px', fontSize: '13px' }}
-                >
-                  <Plus size={14} className="text-info" /> Headers Herdáveis
-                </div>
-                <div
-                  className={`tab ${activeFolderSettingTab === 'vars' ? 'active' : ''}`}
-                  onClick={() => setActiveFolderSettingTab('vars')}
-                  style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 20px', fontSize: '13px' }}
-                >
-                  <Layers size={14} className="text-accent" /> Variáveis Locais (Pasta)
+          <div className="fade-in" style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+            {/* Folder Header — matches workspace style */}
+            <div style={{ padding: '20px 32px 0', borderBottom: '1px solid var(--border-subtle)', background: 'rgba(0,0,0,0.08)' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                <h1 style={{ display: 'flex', alignItems: 'center', gap: '10px', margin: 0, letterSpacing: '-0.5px', fontSize: '22px' }}>
+                  <Folder size={22} className="text-accent" /> {activeNode.name}
+                </h1>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  {[
+                    { label: 'Auth', value: activeNode.folderConfig?.auth.type || 'none', color: activeNode.folderConfig?.auth.type && activeNode.folderConfig.auth.type !== 'none' ? 'var(--success)' : 'var(--text-muted)' },
+                    { label: 'Headers', value: String(activeNode.folderConfig?.headers?.length || 0), color: (activeNode.folderConfig?.headers?.length || 0) > 0 ? 'var(--accent-primary)' : 'var(--text-muted)' },
+                    { label: 'Vars', value: String(activeNode.folderConfig?.variables?.length || 0), color: (activeNode.folderConfig?.variables?.length || 0) > 0 ? 'var(--accent-primary)' : 'var(--text-muted)' },
+                  ].map(s => (
+                    <span key={s.label} style={{ fontSize: '11px', fontFamily: 'var(--font-mono)', padding: '3px 8px', borderRadius: '4px', background: 'var(--bg-deep)', border: '1px solid var(--border-subtle)', color: s.color }}>
+                      {s.label}: <b>{s.value}</b>
+                    </span>
+                  ))}
                 </div>
               </div>
 
-              <div className="tab-pane active" style={{ padding: '24px', minHeight: '180px' }}>
-                {activeFolderSettingTab === 'auth' && (
-                  <div className="fade-in">
-                    <div style={{ marginBottom: '16px' }}>
-                      <label style={{ color: 'var(--text-secondary)', display: 'block', marginBottom: '8px', fontSize: '13px', fontWeight: 600 }}>Esquema Central de Auth</label>
-                      <select
-                        value={activeNode.folderConfig?.auth.type || 'none'}
-                        onChange={e => handleActiveFolderConfigChange({ auth: { ...(activeNode.folderConfig?.auth || defaultFolderAuth), type: e.target.value as AuthType } })}
-                        className="select-input"
-                        style={{ width: '400px' }}
-                      >
-                        <option value="none">No Auth (Público)</option>
-                        <option value="bearer">Bearer Token (JWT)</option>
-                        <option value="oauth2">OAuth 2.0 (Flow)</option>
-                        <option value="basic">Basic Auth</option>
-                        <option value="apikey">API Key Headers</option>
-                      </select>
-                    </div>
-                    <div style={{ maxWidth: '600px' }}>
-                      {renderAuthFields(activeNode.folderConfig?.auth || defaultFolderAuth, (u) => handleActiveFolderConfigChange({ auth: { ...(activeNode.folderConfig?.auth || defaultFolderAuth), ...u } }))}
-                    </div>
-                  </div>
-                )}
-
-                {activeFolderSettingTab === 'headers' && (
-                  <div className="fade-in">
-                    {renderVarTable(activeNode.folderConfig?.headers || [], (v) => handleActiveFolderConfigChange({ headers: v }), 'Headers Padrão da Pasta', true)}
-                    <p style={{ marginTop: '12px', fontSize: '11px', color: 'var(--text-muted)' }}>
-                      Headers definidos aqui serão anexados a todas as requisições desta pasta.
-                    </p>
-                  </div>
-                )}
-
-                {activeFolderSettingTab === 'vars' && (
-                  <div className="fade-in">
-                    {renderVarTable(activeNode.folderConfig?.variables || [], (v) => handleActiveFolderConfigChange({ variables: v }), 'Variáveis Focadas da Pasta')}
-                    <p style={{ marginTop: '12px', fontSize: '11px', color: 'var(--text-muted)' }}>
-                      Variáveis da pasta sobrescrevem o Ambiente Ativo e Globais.
-                    </p>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* SCRIPT PANEL (Always visible or toggle?) */}
-            <div className="glass-panel" style={{ padding: '20px', marginBottom: '16px' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-                <h3 style={{ color: 'var(--text-primary)', fontSize: '15px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Terminal size={14} className="text-accent" /> Script JS para Login/Setup da Pasta
-                </h3>
-                <div style={{ display: 'flex', gap: '8px' }}>
+              {/* Folder Tabs */}
+              <div style={{ display: 'flex', gap: '0' }}>
+                {([
+                  { key: 'auth', icon: <Shield size={13} />, label: 'Autenticacao', count: activeNode.folderConfig?.auth.type && activeNode.folderConfig.auth.type !== 'none' ? 1 : 0 },
+                  { key: 'headers', icon: <Network size={13} />, label: 'Headers', count: activeNode.folderConfig?.headers?.length || 0 },
+                  { key: 'vars', icon: <Layers size={13} />, label: 'Variaveis', count: activeNode.folderConfig?.variables?.length || 0 },
+                  { key: 'script', icon: <Terminal size={13} />, label: 'Script', count: activeNode.folderConfig?.setupScript ? 1 : 0 },
+                ] as const).map(tab => (
                   <button
-                    className="btn btn-secondary"
-                    onClick={() => handleActiveFolderConfigChange({
-                      setupScript: '// Exemplo prático de Login Auth:\n\nconst res = await fetch("{{base_url}}/auth/login", {\n  method: "POST",\n  headers: { "Content-Type": "application/json" },\n  body: JSON.stringify({ email: "admin", pass: "123" })\n});\n\nconst data = await res.json();\n\n// Debug: Veja no console abaixo o que o servidor mandou\naurafetch.log(data);\n\n// Guarda no Ambiente ou Global\naurafetch.setEnv("token_acesso", data.token);\naurafetch.log("Token renovado com sucesso!");'
-                    })}
+                    key={tab.key}
+                    onClick={() => setActiveFolderSettingTab(tab.key as typeof activeFolderSettingTab)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '6px',
+                      padding: '10px 18px', fontSize: '12px', fontWeight: 500,
+                      background: 'transparent', border: 'none', cursor: 'pointer',
+                      color: activeFolderSettingTab === tab.key ? 'var(--accent-primary)' : 'var(--text-muted)',
+                      borderBottom: activeFolderSettingTab === tab.key ? '2px solid var(--accent-primary)' : '2px solid transparent',
+                      transition: 'all 0.15s ease',
+                    }}
                   >
-                    <FileText size={14} /> Inserir Exemplo
+                    {tab.icon} {tab.label}
+                    {tab.count > 0 && (
+                      <span style={{
+                        fontSize: '10px', fontFamily: 'var(--font-mono)',
+                        padding: '1px 5px', borderRadius: '3px', lineHeight: '1.4',
+                        background: activeFolderSettingTab === tab.key ? 'var(--accent-primary)' : 'rgba(255,255,255,0.08)',
+                        color: activeFolderSettingTab === tab.key ? '#000' : 'var(--text-muted)',
+                      }}>
+                        {tab.count}
+                      </span>
+                    )}
                   </button>
-                  <button className="btn btn-primary" onClick={() => runFolderScript(activeNode.id)} disabled={loading}>
-                    <Play size={14} fill="currentColor" /> {loading ? 'Executando...' : 'Executar Script Manualmente'}
-                  </button>
-                </div>
-              </div>
-              <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '12px', lineHeight: 1.5 }}>
-                Faça login e guarde o Token no Ambiente ou na Pasta! <br />
-                Expostas: <code style={{ color: 'var(--accent-primary)' }}>fetch()</code>, <code style={{ color: 'var(--success)' }}>aurafetch.setEnv(k, v)</code>, <code style={{ color: 'var(--warning)' }}>aurafetch.setVar(k, v)</code>.
-              </p>
-              <div style={{ borderRadius: '6px', overflow: 'hidden', border: '1px solid var(--border-subtle)', minHeight: '220px' }}>
-                <CodeMirror
-                  value={activeNode.folderConfig?.setupScript || ''}
-                  height="auto"
-                  minHeight="180px"
-                  theme={oneDark}
-                  extensions={[javascript({ jsx: true })]}
-                  onChange={(val) => handleActiveFolderConfigChange({ setupScript: val })}
-                  basicSetup={{
-                    lineNumbers: true,
-                    tabSize: 2,
-                    autocompletion: true,
-                    foldGutter: true
-                  }}
-                />
+                ))}
               </div>
             </div>
 
-            {/* LOGS PANEL */}
-            <div className="glass-panel" style={{ padding: '0', gridColumn: '1 / -1', overflow: 'hidden', borderTop: '1px solid var(--border-subtle)' }}>
-              {renderConsole(activeLogs, () => setActiveLogs([]))}
+            {/* Tab Content */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '24px 32px' }}>
+
+              {/* Auth Tab */}
+              {activeFolderSettingTab === 'auth' && (
+                <div className="fade-in">
+                  <div style={{ marginBottom: '16px' }}>
+                    <label style={{ color: 'var(--text-secondary)', display: 'block', marginBottom: '8px', fontSize: '12px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Esquema de Auth</label>
+                    <select
+                      value={activeNode.folderConfig?.auth.type || 'none'}
+                      onChange={e => handleActiveFolderConfigChange({ auth: { ...(activeNode.folderConfig?.auth || defaultFolderAuth), type: e.target.value as AuthType } })}
+                      className="select-input"
+                      style={{ width: '360px' }}
+                    >
+                      <option value="none">Nenhum (Publico)</option>
+                      <option value="bearer">Bearer Token (JWT)</option>
+                      <option value="oauth2">OAuth 2.0 (Flow)</option>
+                      <option value="basic">Basic Auth</option>
+                      <option value="apikey">API Key</option>
+                    </select>
+                  </div>
+                  <div style={{ maxWidth: '600px' }}>
+                    {renderAuthFields(activeNode.folderConfig?.auth || defaultFolderAuth, (u) => handleActiveFolderConfigChange({ auth: { ...(activeNode.folderConfig?.auth || defaultFolderAuth), ...u } }))}
+                  </div>
+                  {activeNode.folderConfig?.auth.type === 'none' && (
+                    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '40px 0' }}>
+                      <div style={{ width: '56px', height: '56px', borderRadius: '50%', border: '2px dashed var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'center', marginBottom: '12px' }}>
+                        <Shield size={22} style={{ color: 'var(--text-muted)' }} />
+                      </div>
+                      <span style={{ fontSize: '12px', color: 'var(--text-muted)' }}>Selecione um esquema de autenticacao acima</span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Headers Tab */}
+              {activeFolderSettingTab === 'headers' && (
+                <div className="fade-in">
+                  {renderVarTable(activeNode.folderConfig?.headers || [], (v) => handleActiveFolderConfigChange({ headers: v }), '', true)}
+                  <p style={{ marginTop: '10px', fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+                    Headers herdados por todas as requisicoes filhas desta pasta.
+                  </p>
+                </div>
+              )}
+
+              {/* Vars Tab */}
+              {activeFolderSettingTab === 'vars' && (
+                <div className="fade-in">
+                  {renderVarTable(activeNode.folderConfig?.variables || [], (v) => handleActiveFolderConfigChange({ variables: v }), '')}
+                  <p style={{ marginTop: '10px', fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+                    Variaveis da pasta sobrescrevem Ambiente Ativo e Globais.
+                  </p>
+                </div>
+              )}
+
+              {/* Script Tab */}
+              {activeFolderSettingTab === 'script' && (
+                <div className="fade-in">
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '12px' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: '11px', color: 'var(--text-muted)', fontFamily: 'var(--font-mono)' }}>
+                        API: <code style={{ color: 'var(--accent-primary)', fontSize: '11px' }}>fetch()</code> <code style={{ color: 'var(--success)', fontSize: '11px' }}>setEnv(k,v)</code> <code style={{ color: 'var(--warning)', fontSize: '11px' }}>setVar(k,v)</code>
+                      </span>
+                    </div>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button
+                        className="btn btn-secondary"
+                        style={{ padding: '5px 10px', fontSize: '11px' }}
+                        onClick={() => handleActiveFolderConfigChange({
+                          setupScript: '// Exemplo pratico de Login Auth:\n\nconst res = await fetch("{{base_url}}/auth/login", {\n  method: "POST",\n  headers: { "Content-Type": "application/json" },\n  body: JSON.stringify({ email: "admin", pass: "123" })\n});\n\nconst data = await res.json();\n\n// Debug: Veja no console abaixo o que o servidor mandou\naurafetch.log(data);\n\n// Guarda no Ambiente ou Global\naurafetch.setEnv("token_acesso", data.token);\naurafetch.log("Token renovado com sucesso!");'
+                        })}
+                      >
+                        <Code size={12} /> Exemplo
+                      </button>
+                      <button
+                        className="btn btn-primary"
+                        style={{ padding: '5px 12px', fontSize: '11px' }}
+                        onClick={() => runFolderScript(activeNode.id)}
+                        disabled={loading}
+                      >
+                        <Play size={12} fill="currentColor" /> {loading ? 'Executando...' : 'Executar'}
+                      </button>
+                    </div>
+                  </div>
+                  <div style={{ borderRadius: '6px', overflow: 'hidden', border: '1px solid var(--border-subtle)' }}>
+                    <CodeMirror
+                      value={activeNode.folderConfig?.setupScript || ''}
+                      height="auto"
+                      minHeight="180px"
+                      theme={oneDark}
+                      extensions={[javascript({ jsx: true })]}
+                      onChange={(val) => handleActiveFolderConfigChange({ setupScript: val })}
+                      basicSetup={{
+                        lineNumbers: true,
+                        tabSize: 2,
+                        autocompletion: true,
+                        foldGutter: true
+                      }}
+                    />
+                  </div>
+
+                  {/* Inline Console */}
+                  <div style={{ marginTop: '16px', borderRadius: '6px', overflow: 'hidden', border: '1px solid var(--border-subtle)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '6px 12px', background: 'var(--bg-deep)', borderBottom: '1px solid var(--border-subtle)' }}>
+                      <span style={{ fontSize: '11px', color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px', fontFamily: 'var(--font-mono)' }}>Console</span>
+                      <div style={{ display: 'flex', gap: '4px' }}>
+                        <button className="btn-icon" style={{ padding: '2px' }} onClick={() => {
+                          const list = activeLogs || [];
+                          const logsText = list.map(l => {
+                            const timestamp = l.timestamp instanceof Date ? l.timestamp : new Date(l.timestamp);
+                            return `[${timestamp.toLocaleTimeString()}] ${l.message}${l.data ? '\n' + (typeof l.data === 'string' ? l.data : JSON.stringify(l.data, null, 2)) : ''}`;
+                          }).join('\n\n');
+                          navigator.clipboard.writeText(logsText);
+                        }} title="Copiar"><Copy size={12} /></button>
+                        <button className="btn-icon" style={{ padding: '2px' }} onClick={() => setActiveLogs([])} title="Limpar"><Trash2 size={12} /></button>
+                      </div>
+                    </div>
+                    <div style={{ height: '200px', overflowY: 'auto', background: 'rgba(0,0,0,0.15)', fontFamily: 'var(--font-mono)', fontSize: '11px' }}>
+                      {(activeLogs || []).map((log) => {
+                        const timestamp = log.timestamp instanceof Date ? log.timestamp : new Date(log.timestamp);
+                        return (
+                          <div key={log.id} className={`log-line log-${log.type}`}>
+                            <span style={{ color: 'var(--text-muted)', marginRight: '8px' }}>[{timestamp.toLocaleTimeString()}]</span>
+                            <span>{log.message}</span>
+                            {log.data && (
+                              <pre style={{ width: '100%', overflowX: 'auto', whiteSpace: 'pre-wrap', wordWrap: 'break-word', marginTop: '4px', fontSize: '11px', background: 'rgba(0,0,0,0.3)', padding: '6px', borderRadius: '4px', color: 'var(--text-muted)' }}>
+                                {typeof log.data === 'string' ? log.data : JSON.stringify(log.data, null, 2)}
+                              </pre>
+                            )}
+                          </div>
+                        );
+                      })}
+                      {(!activeLogs || activeLogs.length === 0) && (
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: '8px' }}>
+                          <div style={{ width: '36px', height: '36px', borderRadius: '50%', border: '2px dashed var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <Terminal size={14} style={{ color: 'var(--text-muted)' }} />
+                          </div>
+                          <span style={{ fontSize: '11px', color: 'var(--text-muted)' }}>Sem logs</span>
+                        </div>
+                      )}
+                      <AutoScrollEnd dependency={activeLogs || []} />
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         ) : (
@@ -1371,16 +1467,16 @@ export default function App() {
                 </button>
               ) : (
                 <>
-                  <button className="btn btn-secondary" onClick={() => setIsCodeModalOpen(true)} title="Gerar Snippet de Código">
+                  <button className="btn btn-secondary" onClick={() => setIsCodeModalOpen(true)} title="Gerar snippet">
                     <Terminal size={16} />
                   </button>
                   {loading && !isLooping ? (
-                    <button className="btn btn-danger btn-send" onClick={cancelReq} title="Cancelar Requisição">
+                    <button className="btn btn-danger btn-send" onClick={cancelReq} title="Cancelar">
                       <Square size={16} fill="currentColor" /> Cancelar
                     </button>
                   ) : (
                     <button className="btn btn-primary btn-send" onClick={handleSend} disabled={isLooping}>
-                      <Send size={16} /> Fazer Disparo
+                      <Send size={16} /> Enviar
                     </button>
                   )}
 
@@ -1398,7 +1494,7 @@ export default function App() {
                       className={`btn ${isLooping ? 'btn-danger' : 'btn-secondary'}`}
                       style={{ padding: '10px 14px' }}
                       onClick={() => setIsLooping(!isLooping)}
-                      title={isLooping ? "Parar LOOP Automático" : "Derrubar a API (Loop Auto)"}
+                      title={isLooping ? "Parar loop" : "Iniciar loop automatico"}
                     >
                       {isLooping ? <Square size={16} fill="currentColor" /> : <Play size={16} fill="currentColor" />}
                     </button>
@@ -1415,7 +1511,12 @@ export default function App() {
                     {/* WS Chat interface */}
                     <div style={{ padding: '16px', flex: 1, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: '8px', background: 'rgba(0,0,0,0.1)' }}>
                       {activeReq!.wsMessages?.length === 0 && (
-                        <div style={{ color: 'var(--text-muted)', textAlign: 'center', marginTop: '40px' }}>Conecte a um WebSocket para começar a enviar mensagens.</div>
+                        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, gap: '12px' }}>
+                          <div style={{ width: '56px', height: '56px', borderRadius: '50%', border: '2px dashed var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                            <Globe size={22} style={{ color: 'var(--text-muted)' }} />
+                          </div>
+                          <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>Conecte ao WebSocket para enviar mensagens</span>
+                        </div>
                       )}
                       {activeReq!.wsMessages?.map(m => (
                         <div key={m.id} style={{
@@ -1429,8 +1530,8 @@ export default function App() {
                           border: m.type === 'received' ? '1px solid var(--border-strong)' : 'none',
                           boxShadow: m.type === 'sent' ? '0 4px 10px rgba(99,102,241,0.2)' : 'none'
                         }}>
-                          {m.type === 'sent' ? <span style={{ fontSize: '10px', opacity: 0.7, marginRight: '8px' }}>⇧ Enviado</span> : ''}
-                          {m.type === 'received' ? <span style={{ fontSize: '10px', opacity: 0.5, marginRight: '8px', color: 'var(--success)' }}>⇩ Recebido</span> : ''}
+                          {m.type === 'sent' ? <span style={{ fontSize: '10px', opacity: 0.7, marginRight: '8px', fontFamily: 'var(--font-mono)' }}>SENT</span> : ''}
+                          {m.type === 'received' ? <span style={{ fontSize: '10px', opacity: 0.5, marginRight: '8px', color: 'var(--success)', fontFamily: 'var(--font-mono)' }}>RECV</span> : ''}
                           <pre style={{ margin: 0, fontFamily: 'var(--font-mono)', whiteSpace: 'pre-wrap' }}>{m.text}</pre>
                         </div>
                       ))}
@@ -1459,18 +1560,18 @@ export default function App() {
                 ) : (
                   <>
                     <div className="tabs">
-                      <div className={`tab ${activeReqTab === 'params' ? 'active' : ''}`} onClick={() => setActiveReqTab('params')}>Params (URL)</div>
-                      <div className={`tab ${activeReqTab === 'queries' ? 'active' : ''}`} onClick={() => setActiveReqTab('queries')}>Queries <span className="badge">{(activeReq!.queryParams || []).filter(q => q.key).length || ''}</span></div>
-                      <div className={`tab ${activeReqTab === 'auth' ? 'active' : ''}`} onClick={() => setActiveReqTab('auth')}>Autenticação</div>
-                      <div className={`tab ${activeReqTab === 'headers' ? 'active' : ''}`} onClick={() => setActiveReqTab('headers')}>Headers Custo. <span className="badge">{(activeReq!.headers || []).filter(h => h.key).length || ''}</span></div>
-                      <div className={`tab ${activeReqTab === 'body' ? 'active' : ''}`} onClick={() => setActiveReqTab('body')}>Payload / Body</div>
+                      <div className={`tab ${activeReqTab === 'params' ? 'active' : ''}`} onClick={() => setActiveReqTab('params')}>Params</div>
+                      <div className={`tab ${activeReqTab === 'queries' ? 'active' : ''}`} onClick={() => setActiveReqTab('queries')}>Query <span className="badge">{(activeReq!.queryParams || []).filter(q => q.key).length || ''}</span></div>
+                      <div className={`tab ${activeReqTab === 'auth' ? 'active' : ''}`} onClick={() => setActiveReqTab('auth')}>Auth</div>
+                      <div className={`tab ${activeReqTab === 'headers' ? 'active' : ''}`} onClick={() => setActiveReqTab('headers')}>Headers <span className="badge">{(activeReq!.headers || []).filter(h => h.key).length || ''}</span></div>
+                      <div className={`tab ${activeReqTab === 'body' ? 'active' : ''}`} onClick={() => setActiveReqTab('body')}>Body</div>
                     </div>
 
                     <div style={{ padding: '16px 12px', flex: 1, display: 'flex', flexDirection: 'column', overflowY: 'auto' }}>
                       {activeReqTab === 'params' && (
                         <div className="headers-container" style={{ marginTop: 0 }}>
                           <h3 style={{ marginBottom: '16px', color: 'var(--text-primary)', fontSize: '15px' }}>Path Parameters</h3>
-                          <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '16px' }}>Reemplace <code>:id</code> o <code>{'{id}'}</code> en la URL.</p>
+                          <p style={{ color: 'var(--text-secondary)', fontSize: '13px', marginBottom: '16px' }}>Substitua <code style={{ color: 'var(--accent-primary)' }}>:id</code> ou <code style={{ color: 'var(--accent-primary)' }}>{'{id}'}</code> na URL.</p>
                           {renderVarTable(activeReq!.params || [], (v) => handleActiveReqChange({ params: v }), '', true)}
                         </div>
                       )}
@@ -1485,25 +1586,25 @@ export default function App() {
                       {activeReqTab === 'auth' && (
                         <div className="glass-panel" style={{ padding: '24px 32px' }}>
                           <div style={{ marginBottom: '16px' }}>
-                            <label style={{ color: 'var(--text-secondary)', display: 'block', marginBottom: '8px', fontSize: '13px', fontWeight: 600 }}>Sobrescrever Auth da Pasta</label>
+                            <label style={{ color: 'var(--text-secondary)', display: 'block', marginBottom: '8px', fontSize: '12px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.5px' }}>Esquema de Auth</label>
                             <select
                               value={activeReq!.auth.type}
                               onChange={e => handleActiveReqChange({ auth: { ...activeReq!.auth, type: e.target.value as AuthType } })}
                               className="select-input"
                               style={{ width: '300px' }}
                             >
-                              <option value="inherit">Inherit Auth (Herdar do Pai)</option>
-                              <option value="none">No Auth (Deixar Vazio)</option>
-                              <option value="bearer">Bearer Token Mestre</option>
-                              <option value="oauth2">OAuth 2.0 (Token)</option>
-                              <option value="basic">Basic Auth User</option>
-                              <option value="apikey">API Key Custo.</option>
+                              <option value="inherit">Herdar da Pasta</option>
+                              <option value="none">Nenhum</option>
+                              <option value="bearer">Bearer Token</option>
+                              <option value="oauth2">OAuth 2.0</option>
+                              <option value="basic">Basic Auth</option>
+                              <option value="apikey">API Key</option>
                             </select>
 
                             {activeReq!.auth.type === 'inherit' && (
-                              <div style={{ marginTop: '16px', padding: '12px 16px', background: 'rgba(99, 102, 241, 0.1)', borderLeft: '3px solid var(--accent-primary)', borderRadius: '4px' }}>
-                                <p style={{ color: 'var(--text-primary)', fontSize: '13px', margin: 0 }}>
-                                  Esta requisição herda a autenticação da pasta pai. Certifique-se que a pasta pai tem um Bearer Token configurado (pode ser {'{{var}}'}).
+                              <div style={{ marginTop: '16px', padding: '10px 14px', background: 'rgba(99, 102, 241, 0.08)', borderLeft: '2px solid var(--accent-primary)', borderRadius: '4px' }}>
+                                <p style={{ color: 'var(--text-secondary)', fontSize: '12px', margin: 0, fontFamily: 'var(--font-mono)' }}>
+                                  Herda autenticacao da pasta pai. Configure auth na pasta para que seja aplicada aqui.
                                 </p>
                               </div>
                             )}
@@ -1517,8 +1618,8 @@ export default function App() {
                         <div className="headers-container">
                           <div className="headers-grid header-row-title" style={{ gridTemplateColumns: '30px 1fr 1fr 40px' }}>
                             <div></div>
-                            <div>Chave / Header Key</div>
-                            <div>Valor da Chave</div>
+                            <div>Chave</div>
+                            <div>Valor</div>
                             <div></div>
                           </div>
                           {activeReq!.headers.map((h, i) => (
@@ -1566,12 +1667,12 @@ export default function App() {
                           ))}
                           <button
                             className="btn btn-secondary"
-                            style={{ marginTop: '16px' }}
+                            style={{ marginTop: '12px', fontSize: '11px' }}
                             onClick={() => {
                               handleActiveReqChange({ headers: [...activeReq!.headers, { id: uuidv4(), key: '', value: '', enabled: true }] });
                             }}
                           >
-                            <Plus size={16} /> Nova Linha de Header
+                            <Plus size={14} /> Adicionar Header
                           </button>
 
                           <datalist id="common-headers">
@@ -1713,7 +1814,7 @@ export default function App() {
                                               const file = e.target.files?.[0];
                                               if (!file) return;
                                               if (file.size > MAX_FILE_UPLOAD_BYTES) {
-                                                addLog('error', `❌ Arquivo "${file.name}" excede o limite de ${MAX_FILE_UPLOAD_MB}MB. Selecione um arquivo menor.`);
+                                                addLog('error', `Arquivo "${file.name}" excede o limite de ${MAX_FILE_UPLOAD_MB}MB. Selecione um arquivo menor.`);
                                                 return;
                                               }
                                               const next = activeReq!.formData.map(x =>
@@ -1818,16 +1919,13 @@ export default function App() {
                             )}
 
                             {activeReq!.bodyType === 'binary' && (
-                              <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '20px', padding: '40px' }}>
-                                <div style={{ width: '64px', height: '64px', borderRadius: '50%', background: 'rgba(99, 102, 241, 0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                  <Download size={32} className="text-accent" style={{ opacity: 0.6 }} />
+                              <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '16px', padding: '40px' }}>
+                                <div style={{ width: '56px', height: '56px', borderRadius: '50%', border: '2px dashed var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                  <Upload size={22} style={{ color: 'var(--text-muted)' }} />
                                 </div>
-                                <div style={{ textAlign: 'center' }}>
-                                  <h3 style={{ fontSize: '16px', marginBottom: '8px' }}>Corpo Binário (Binary Body)</h3>
-                                  <p style={{ color: 'var(--text-muted)', fontSize: '13px', maxWidth: '300px' }}>Selecione um arquivo para ser enviado como o corpo bruto (raw byte array) desta requisição.</p>
-                                </div>
-                                <button className="btn btn-primary" onClick={pickBinaryFile}>
-                                  <Upload size={16} /> {activeReq!.binaryFile ? 'Alterar Arquivo' : 'Selecionar Arquivo'}
+                                <span style={{ color: 'var(--text-muted)', fontSize: '12px', textAlign: 'center', maxWidth: '280px' }}>Selecione um arquivo binario para enviar como corpo da requisicao</span>
+                                <button className="btn btn-primary" style={{ padding: '6px 14px', fontSize: '12px' }} onClick={pickBinaryFile}>
+                                  <Upload size={14} /> {activeReq!.binaryFile ? 'Alterar Arquivo' : 'Selecionar Arquivo'}
                                 </button>
                                 {activeReq!.binaryFile && (
                                   <div style={{ background: 'rgba(0,0,0,0.2)', padding: '12px 20px', borderRadius: '8px', border: '1px solid var(--border-subtle)', display: 'flex', gap: '12px', alignItems: 'center' }}>
@@ -1845,9 +1943,11 @@ export default function App() {
                             )}
 
                             {activeReq!.bodyType === 'none' && (
-                              <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', gap: '12px' }}>
-                                <AlertTriangle size={32} style={{ opacity: 0.2 }} />
-                                <span>Esta requisição não enviará corpo (body).</span>
+                              <div style={{ height: '100%', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '12px' }}>
+                                <div style={{ width: '48px', height: '48px', borderRadius: '50%', border: '2px dashed var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                  <FileText size={18} style={{ color: 'var(--text-muted)' }} />
+                                </div>
+                                <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>Sem corpo nesta requisicao</span>
                               </div>
                             )}
                           </div>
@@ -1874,15 +1974,15 @@ export default function App() {
                   {activeReq?.method !== 'WS' && (
                     <>
                       <div className={`tab ${activeResTab === 'response' ? 'active' : ''}`} onClick={() => setActiveResTab('response')}>
-                        Resposta Renderizada {activeResponse && <span className={`status-dot ${activeResponse.status >= 200 && activeResponse.status < 300 ? 'dot-success' : activeResponse.status === 0 ? 'dot-warn' : 'dot-error'}`}></span>}
+                        Resposta {activeResponse && <span className={`status-dot ${activeResponse.status >= 200 && activeResponse.status < 300 ? 'dot-success' : activeResponse.status === 0 ? 'dot-warn' : 'dot-error'}`}></span>}
                       </div>
                       <div className={`tab ${activeResTab === 'headers' ? 'active' : ''}`} onClick={() => setActiveResTab('headers')}>
-                        Response Headers <span className="badge">{activeResponse?.headers ? Object.keys(activeResponse.headers).length : ''}</span>
+                        Headers <span className="badge">{activeResponse?.headers ? Object.keys(activeResponse.headers).length : ''}</span>
                       </div>
                     </>
                   )}
                   <div className={`tab ${activeResTab === 'console' || activeReq?.method === 'WS' ? 'active' : ''}`} onClick={() => setActiveResTab('console')}>
-                    <Terminal size={14} /> Console / Timestamps <span className="badge">{activeLogs.length}</span>
+                    <Terminal size={14} /> Console <span className="badge">{activeLogs.length || ''}</span>
                   </div>
                 </div>
 
@@ -1903,38 +2003,41 @@ export default function App() {
                                 <span className={`status-badge ${activeResponse.status >= 200 && activeResponse.status < 300 ? 'status-success' : activeResponse.status === 0 ? 'status-warning' : 'status-error'}`}>
                                   {activeResponse.status === 0 ? 'ERR/000' : `${activeResponse.status} ${activeResponse.statusText}`}
                                 </span>
-                                <span style={{ color: 'var(--text-muted)', fontSize: '13px', fontWeight: 500, fontFamily: 'var(--font-mono)' }}>Ping: <span style={{ color: 'var(--info)' }}>{activeResponse.time} ms</span></span>
+                                <span style={{ color: 'var(--text-muted)', fontSize: '12px', fontWeight: 500, fontFamily: 'var(--font-mono)' }}><span style={{ color: 'var(--info)' }}>{activeResponse.time}ms</span></span>
                               </div>
 
-                              <div style={{ display: 'flex', gap: '8px' }}>
-                                <button className="btn btn-secondary" onClick={() => { setActiveResponse(null); setActiveLogs([]); }} style={{ padding: '6px 12px', fontSize: '12px', color: 'var(--danger)', borderColor: 'rgba(239, 68, 68, 0.3)' }}>
-                                  <Trash2 size={14} /> Limpar
+                              <div style={{ display: 'flex', gap: '6px' }}>
+                                <button className="btn btn-secondary" onClick={() => { setActiveResponse(null); setActiveLogs([]); }} style={{ padding: '5px 10px', fontSize: '11px', color: 'var(--danger)', borderColor: 'rgba(239, 68, 68, 0.3)' }} title="Limpar">
+                                  <Trash2 size={13} />
                                 </button>
-                                <button className="btn btn-secondary" onClick={copyResponse} style={{ padding: '6px 12px', fontSize: '12px' }}>
-                                  {copiedRes ? <Check size={14} className="text-success" /> : <Copy size={14} />} {copiedRes ? 'Copiado!' : 'Clipboard'}
+                                <button className="btn btn-secondary" onClick={copyResponse} style={{ padding: '5px 10px', fontSize: '11px' }} title="Copiar">
+                                  {copiedRes ? <Check size={13} className="text-success" /> : <Copy size={13} />}
                                 </button>
-                                <button className="btn btn-secondary" onClick={downloadResponse} style={{ padding: '6px 12px', fontSize: '12px' }} title="Salvar resposta no Disco">
-                                  <Download size={14} /> Download
+                                <button className="btn btn-secondary" onClick={downloadResponse} style={{ padding: '5px 10px', fontSize: '11px' }} title="Download">
+                                  <Download size={13} />
                                 </button>
                               </div>
                             </div>
                             <div style={{ flex: 1, marginTop: '12px', borderRadius: '6px', border: '1px solid var(--border-subtle)', background: '#212121', display: 'flex', flexDirection: 'column', minHeight: 0 }}>
                               {activeResponse.type === 'image' ? (
                                 <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'auto', padding: '20px' }}>
-                                  <img src={activeResponse.data} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: '4px', boxShadow: '0 4px 20px rgba(0,0,0,0.5)' }} alt="Response" />
+                                  <img src={responseBlobUrl || activeResponse.data} style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain', borderRadius: '4px', boxShadow: '0 4px 20px rgba(0,0,0,0.5)' }} alt="Response" />
                                 </div>
                               ) : activeResponse.type === 'pdf' ? (
-                                <iframe src={activeResponse.data} style={{ width: '100%', height: '100%', border: 'none' }} title="PDF Preview" />
+                                responseBlobUrl
+                                  ? <iframe src={responseBlobUrl} style={{ width: '100%', height: '100%', border: 'none' }} title="PDF Preview" />
+                                  : <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', fontSize: '12px' }}>Falha ao renderizar PDF</div>
                               ) : activeResponse.type === 'html' ? (
                                 <iframe srcDoc={activeResponse.data} style={{ width: '100%', height: '100%', border: 'none', background: 'white' }} title="HTML Preview" />
                               ) : activeResponse.type === 'binary' ? (
-                                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)', gap: '15px' }}>
-                                  <Database size={48} style={{ opacity: 0.3 }} />
-                                  <div style={{ textAlign: 'center' }}>
-                                    <p style={{ fontSize: '16px', fontWeight: 600, color: 'var(--text-primary)' }}>Arquivo Binário Detectado</p>
-                                    <p style={{ fontSize: '12px' }}>Este conteúdo não pode ser renderizado como texto (Ex: ZIP, EXE, Fonte).</p>
+                                <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '12px' }}>
+                                  <div style={{ width: '56px', height: '56px', borderRadius: '50%', border: '2px dashed var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    <Database size={22} style={{ color: 'var(--text-muted)' }} />
                                   </div>
-                                  <button className="btn btn-primary" onClick={downloadResponse}>
+                                  <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>
+                                    Conteudo binario ({activeResponse.contentType?.split(';')[0] || 'desconhecido'})
+                                  </span>
+                                  <button className="btn btn-primary" style={{ padding: '6px 14px', fontSize: '12px' }} onClick={downloadResponse}>
                                     <Download size={14} /> Baixar Arquivo
                                   </button>
                                 </div>
@@ -1957,9 +2060,11 @@ export default function App() {
                             </div>
                           </>
                         ) : (
-                          <div style={{ display: 'flex', flex: 1, alignItems: 'center', justifyContent: 'center', color: 'rgba(255,255,255,0.1)', flexDirection: 'column', gap: '20px' }}>
-                            <Send size={64} style={{ opacity: 0.3 }} />
-                            <span style={{ color: 'var(--text-muted)', fontSize: '16px', letterSpacing: '0.5px' }}>Tiro de sniper aguardando... Aperte "Disparo".</span>
+                          <div style={{ display: 'flex', flex: 1, alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '12px' }}>
+                            <div style={{ width: '56px', height: '56px', borderRadius: '50%', border: '2px dashed var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <Send size={22} style={{ color: 'var(--text-muted)' }} />
+                            </div>
+                            <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>Envie uma requisicao para ver a resposta</span>
                           </div>
                         )}
                       </div>
@@ -1970,8 +2075,8 @@ export default function App() {
                         {activeResponse?.headers ? (
                           <div className="glass-panel" style={{ padding: 0, overflow: 'hidden' }}>
                             <div className="headers-grid header-row-title" style={{ gridTemplateColumns: 'minmax(200px, 1fr) 2fr', background: 'rgba(0,0,0,0.2)', padding: '12px 20px' }}>
-                              <div>Header Key / Chave</div>
-                              <div>Value / Valor</div>
+                              <div>Chave</div>
+                              <div>Valor</div>
                             </div>
                             <div style={{ maxHeight: '500px', overflowY: 'auto' }}>
                               {Object.entries(activeResponse.headers).map(([key, value]) => (
@@ -1983,8 +2088,11 @@ export default function App() {
                             </div>
                           </div>
                         ) : (
-                          <div style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '40px' }}>
-                            Aguardando disparo da requisição para capturar headers...
+                          <div style={{ display: 'flex', flex: 1, alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: '12px' }}>
+                            <div style={{ width: '56px', height: '56px', borderRadius: '50%', border: '2px dashed var(--border-color)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <Network size={22} style={{ color: 'var(--text-muted)' }} />
+                            </div>
+                            <span style={{ color: 'var(--text-muted)', fontSize: '12px' }}>Headers aparecem apos enviar a requisicao</span>
                           </div>
                         )}
                       </div>
@@ -2013,9 +2121,9 @@ export default function App() {
           color: 'var(--text-primary)', zIndex: 9999
         }}>
           <div style={{ fontSize: '48px', animation: 'spin 1.5s linear infinite', marginBottom: '16px' }}><Globe /></div>
-          <div style={{ fontSize: '18px', fontWeight: 600, letterSpacing: '1px' }}>Processando requisição...</div>
-          <div style={{ fontSize: '13px', color: 'var(--text-muted)', marginTop: '8px', marginBottom: '24px' }}>Isso pode levar alguns segundos, ou o timeout será atingido.</div>
-          <button className="btn btn-danger" style={{ padding: '8px 24px', fontSize: '14px' }} onClick={cancelReq}>Cancelar Requisição</button>
+          <div style={{ fontSize: '16px', fontWeight: 600, letterSpacing: '0.5px' }}>Processando...</div>
+          <div style={{ fontSize: '12px', color: 'var(--text-muted)', marginTop: '6px', marginBottom: '20px' }}>Aguardando resposta do servidor</div>
+          <button className="btn btn-danger" style={{ padding: '6px 20px', fontSize: '13px' }} onClick={cancelReq}>Cancelar</button>
         </div>
       )}
 

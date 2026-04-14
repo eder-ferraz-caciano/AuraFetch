@@ -8,7 +8,7 @@ describe('AuraFetch - Upload de Arquivo Real', () => {
     // Selecionar "Listar Dados", trocar para POST e ativar FORM-DATA
     cy.get('.sidebar-tree-container').contains('Listar Dados').click({ force: true });
     cy.get('.method-select').select('POST');
-    cy.get('.tab').contains('Payload / Body').click();
+    cy.get('.tab').contains('Body').click();
     cy.contains('label', 'FORM-DATA').click();
   });
 
@@ -29,7 +29,7 @@ describe('AuraFetch - Upload de Arquivo Real', () => {
         // O nome do arquivo deve aparecer (upload aceito)
         cy.contains('49mb').should('be.visible');
         // Verificar no console que não há erro de tamanho
-        cy.get('.tab').contains('Console / Timestamps').click();
+        cy.get('.tab').contains('Console').click();
         cy.get('.console-panel').should('not.contain', 'excede o limite');
       });
     });
@@ -40,7 +40,7 @@ describe('AuraFetch - Upload de Arquivo Real', () => {
         cy.get('.select-input').last().select('file');
         cy.get('[data-testid="formdata-file-input"]').selectFile(filePath as string, { force: true });
         // Deve exibir o erro de tamanho no console
-        cy.get('.tab').contains('Console / Timestamps').click();
+        cy.get('.tab').contains('Console').click();
         cy.get('.console-panel', { timeout: 5000 }).should('contain', 'excede o limite');
       });
     });
@@ -52,7 +52,7 @@ describe('AuraFetch - Upload de Arquivo Real', () => {
         cy.get('[data-testid="formdata-file-input"]').selectFile(filePath as string, { force: true });
         // 50MB exato é aceito pois o guard usa > (não >=)
         cy.contains('50mb').should('be.visible');
-        cy.get('.tab').contains('Console / Timestamps').click();
+        cy.get('.tab').contains('Console').click();
         cy.get('.console-panel').should('not.contain', 'excede o limite');
       });
     });
@@ -82,7 +82,7 @@ describe('AuraFetch - Upload de Arquivo Real', () => {
       // Enviar
       cy.get('input[placeholder="{{base_url}}/api/..."]').clear().type(`${POSTMAN_ECHO}/post`, { parseSpecialCharSequences: false });
       cy.intercept('POST', `${POSTMAN_ECHO}/post`).as('formDataReq');
-      cy.contains('button', 'Fazer Disparo').click({ force: true });
+      cy.contains('button', 'Enviar').click({ force: true });
       cy.wait('@formDataReq', { timeout: 30000 });
       cy.get('.status-badge', { timeout: 15000 }).should('be.visible');
       cy.get('.body-content', { timeout: 15000 }).should('contain', 'descricao');
@@ -95,7 +95,7 @@ describe('AuraFetch - Upload de Arquivo Real', () => {
       cy.get('input[placeholder="{{base_url}}/api/..."]').clear().type(`${POSTMAN_ECHO}/post`, { parseSpecialCharSequences: false });
       // Interceptar para verificar headers
       cy.intercept('POST', `${POSTMAN_ECHO}/post`).as('upload');
-      cy.contains('button', 'Fazer Disparo').click({ force: true });
+      cy.contains('button', 'Enviar').click({ force: true });
       cy.wait('@upload').then(interception => {
         const contentType = interception.request.headers['content-type'] as string;
         expect(contentType).to.include('multipart/form-data');
@@ -114,7 +114,7 @@ describe('AuraFetch - Upload de Arquivo Real', () => {
       cy.get('.app-title', { timeout: 30000 }).should('be.visible');
       cy.get('.sidebar-tree-container').contains('Listar Dados').click({ force: true });
       cy.get('.method-select').select('POST');
-      cy.get('.tab').contains('Payload / Body').click();
+      cy.get('.tab').contains('Body').click();
       cy.contains('label', 'BINARY').click();
     });
 
@@ -122,7 +122,7 @@ describe('AuraFetch - Upload de Arquivo Real', () => {
       cy.get('[data-testid="binary-file-input"]').selectFile('cypress/fixtures/sample-image.png', { force: true });
       cy.get('input[placeholder="{{base_url}}/api/..."]').clear().type(`${POSTMAN_ECHO}/post`, { parseSpecialCharSequences: false });
       cy.intercept('POST', `${POSTMAN_ECHO}/post`).as('binaryUpload');
-      cy.contains('button', 'Fazer Disparo').click({ force: true });
+      cy.contains('button', 'Enviar').click({ force: true });
       cy.wait('@binaryUpload').then(interception => {
         expect(interception.request.headers['content-length']).to.exist;
       });

@@ -49,7 +49,7 @@ describe('AuraFetch - Regressões Fase 1', () => {
       cy.intercept('GET', `${POSTMAN_ECHO}/get*`, { body: largePayload, statusCode: 200 }).as('largeGet');
       cy.get('.sidebar-tree-container').contains('Listar Dados').click({ force: true });
       cy.get('input[placeholder="{{base_url}}/api/..."]').clear().type(`${POSTMAN_ECHO}/get`, { parseSpecialCharSequences: false });
-      cy.contains('button', 'Fazer Disparo').click({ force: true });
+      cy.contains('button', 'Enviar').click({ force: true });
       cy.wait('@largeGet');
       cy.get('.status-badge', { timeout: 15000 }).should('be.visible');
     });
@@ -59,7 +59,7 @@ describe('AuraFetch - Regressões Fase 1', () => {
       cy.intercept('GET', `${POSTMAN_ECHO}/get*`, { body: largePayload, statusCode: 200 }).as('largeGet');
       cy.get('.sidebar-tree-container').contains('Listar Dados').click({ force: true });
       cy.get('input[placeholder="{{base_url}}/api/..."]').clear().type(`${POSTMAN_ECHO}/get`, { parseSpecialCharSequences: false });
-      cy.contains('button', 'Fazer Disparo').click({ force: true });
+      cy.contains('button', 'Enviar').click({ force: true });
       cy.wait('@largeGet');
       cy.get('.status-badge', { timeout: 15000 }).should('be.visible');
       // Árvore ainda clicável após response grande
@@ -72,7 +72,7 @@ describe('AuraFetch - Regressões Fase 1', () => {
       cy.intercept('GET', `${POSTMAN_ECHO}/get*`, { body: largePayload, statusCode: 200 }).as('apiCall');
       cy.get('.sidebar-tree-container').contains('Listar Dados').click({ force: true });
       cy.get('input[placeholder="{{base_url}}/api/..."]').clear().type(`${POSTMAN_ECHO}/get`, { parseSpecialCharSequences: false });
-      cy.contains('button', 'Fazer Disparo').click({ force: true });
+      cy.contains('button', 'Enviar').click({ force: true });
       cy.wait('@apiCall');
       cy.get('.status-badge', { timeout: 15000 }).should('be.visible');
       // Verificar que o localStorage NÃO contém os dados da response
@@ -169,13 +169,13 @@ describe('AuraFetch - Regressões Fase 1', () => {
       cy.intercept('GET', '**/get*', { body: { resultado: 'ok' }, statusCode: 200 }).as('req');
       cy.get('.sidebar-tree-container').contains('Listar Dados').click({ force: true });
       cy.get('input[placeholder="{{base_url}}/api/..."]').clear().type('https://postman-echo.com/get', { parseSpecialCharSequences: false });
-      cy.contains('button', 'Fazer Disparo').click({ force: true });
+      cy.contains('button', 'Enviar').click({ force: true });
       cy.wait('@req');
       cy.get('.status-badge', { timeout: 15000 }).should('be.visible');
       cy.window().then(win => {
         cy.stub(win.HTMLAnchorElement.prototype, 'click').as('downloadClick');
       });
-      cy.get('button[title="Salvar resposta no Disco"]').click();
+      cy.get('button[title="Download"]').click();
       cy.get('@downloadClick').should('have.been.calledOnce');
     });
   });
@@ -212,7 +212,7 @@ describe('AuraFetch - Regressões Fase 1', () => {
       cy.intercept('GET', '**/get*', { body: { ok: true }, statusCode: 200 }).as('req');
       cy.get('.sidebar-tree-container').contains('Listar Dados').click({ force: true });
       cy.get('input[placeholder="{{base_url}}/api/..."]').clear().type('https://postman-echo.com/get', { parseSpecialCharSequences: false });
-      cy.contains('button', 'Fazer Disparo').click({ force: true });
+      cy.contains('button', 'Enviar').click({ force: true });
       cy.wait('@req');
       cy.get('.status-badge', { timeout: 15000 }).should('be.visible');
       cy.get('@consoleWarn').should('not.have.been.called');

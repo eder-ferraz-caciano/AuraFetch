@@ -192,7 +192,7 @@ export const useCollection = (params?: UseCollectionParams) => {
         });
       setCollection(updateNode(collection));
       setActiveNodeId(newFolder.id);
-      addLog('info', '📁 Nova pasta criada');
+      addLog('info', 'Nova pasta criada');
     },
     [collection, setCollection, setActiveNodeId, addLog]
   );
@@ -240,7 +240,7 @@ export const useCollection = (params?: UseCollectionParams) => {
         });
       setCollection(updateNode(collection));
       setActiveNodeId(wsReq.id);
-      addLog('info', '🌐 Nova conexão WebSocket adicionada.');
+      addLog('info', 'Nova conexao WebSocket adicionada.');
     },
     [collection, setCollection, setActiveNodeId, addLog]
   );

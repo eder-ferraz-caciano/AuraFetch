@@ -83,11 +83,11 @@ export const useWebSocket = (props?: UseWebSocketProps) => {
           return update(prev);
         });
 
-        addLog('info', `📨 WS recebido: ${textData.substring(0, 100)}${textData.length > 100 ? '...' : ''}`);
+        addLog('info', `WS recebido: ${textData.substring(0, 100)}${textData.length > 100 ? '...' : ''}`);
       });
 
     } catch (err: any) {
-      addLog('error', `❌ Falha ao conectar WS: ${err.message || err.toString()}`);
+      addLog('error', `Falha ao conectar WS: ${err.message || err.toString()}`);
     } finally {
       props!.setLoading(false);
     }

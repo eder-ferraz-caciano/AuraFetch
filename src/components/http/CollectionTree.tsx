@@ -3,7 +3,7 @@ import { useRequestContext } from '../../context/RequestContext';
 import { useCollection } from '../../hooks/useCollection';
 import {
   Folder, Download, Upload, Trash2, Edit2, FilePlus,
-  ChevronRight, ChevronDown, CopyPlus, Globe, MoreHorizontal, Database, AlertTriangle
+  ChevronRight, ChevronDown, CopyPlus, Globe, MoreHorizontal, Database, AlertTriangle, Clock
 } from 'lucide-react';
 import type { CollectionNode, HistoryEntry } from '../../types';
 
@@ -45,6 +45,18 @@ export const CollectionTree: React.FC<CollectionTreeProps> = ({ exportCollection
   const switchActiveNode = (nodeId: string | null) => {
     setActiveNodeId(nodeId);
   };
+
+  const countRequests = (nodes: CollectionNode[]): number => {
+    let count = 0;
+    for (const n of nodes) {
+      if (n.type === 'request') count++;
+      if (n.children) count += countRequests(n.children);
+    }
+    return count;
+  };
+
+  const requestCount = countRequests(collection);
+  const historyCount = activeNodeId ? getWorkspaceHistory(activeNodeId).length : 0;
 
   // Tree rendering function
   const renderTree = (nodes: CollectionNode[], depth = 0) => {
@@ -217,7 +229,7 @@ export const CollectionTree: React.FC<CollectionTreeProps> = ({ exportCollection
   };
 
   return (
-    <aside className="sidebar" style={{ display: 'flex', flexDirection: 'column', height: '100vh' }}>
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
       {/* 1. Header (Fixed Top) */}
       <div style={{ padding: '20px 16px 14px 16px', borderBottom: '1px solid var(--border-subtle)', background: 'rgba(0,0,0,0.1)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '14px' }}>
@@ -243,23 +255,42 @@ export const CollectionTree: React.FC<CollectionTreeProps> = ({ exportCollection
       <div style={{ display: 'flex', borderBottom: '1px solid var(--border-subtle)', background: 'rgba(0,0,0,0.1)' }}>
         <button
           onClick={() => setSidebarTab('collection')}
-          style={{ flex: 1, padding: '12px', fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', color: sidebarTab === 'collection' ? 'var(--accent-primary)' : 'var(--text-muted)', border: 'none', background: 'transparent', cursor: 'pointer', borderBottom: sidebarTab === 'collection' ? '2px solid var(--accent-primary)' : 'none' }}
+          style={{ flex: 1, padding: '12px', fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', color: sidebarTab === 'collection' ? 'var(--accent-primary)' : 'var(--text-muted)', border: 'none', background: 'transparent', cursor: 'pointer', borderBottom: sidebarTab === 'collection' ? '2px solid var(--accent-primary)' : '2px solid transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
         >
-          Coleções
+          Colecoes
+          {requestCount > 0 && (
+            <span style={{
+              fontSize: '9px', fontWeight: 700, fontFamily: 'monospace',
+              padding: '1px 5px', borderRadius: '8px',
+              backgroundColor: sidebarTab === 'collection' ? 'var(--accent-primary)' : 'rgba(255,255,255,0.08)',
+              color: sidebarTab === 'collection' ? '#fff' : 'var(--text-muted)',
+            }}>
+              {requestCount}
+            </span>
+          )}
         </button>
         <button
           onClick={() => setSidebarTab('history')}
-          style={{ flex: 1, padding: '12px', fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', color: sidebarTab === 'history' ? 'var(--accent-primary)' : 'var(--text-muted)', border: 'none', background: 'transparent', cursor: 'pointer', borderBottom: sidebarTab === 'history' ? '2px solid var(--accent-primary)' : 'none' }}
+          style={{ flex: 1, padding: '12px', fontSize: '11px', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.5px', color: sidebarTab === 'history' ? 'var(--accent-primary)' : 'var(--text-muted)', border: 'none', background: 'transparent', cursor: 'pointer', borderBottom: sidebarTab === 'history' ? '2px solid var(--accent-primary)' : '2px solid transparent', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
         >
-          Histórico
+          Historico
+          {historyCount > 0 && (
+            <span style={{
+              fontSize: '9px', fontWeight: 700, fontFamily: 'monospace',
+              padding: '1px 5px', borderRadius: '8px',
+              backgroundColor: sidebarTab === 'history' ? 'var(--accent-primary)' : 'rgba(255,255,255,0.08)',
+              color: sidebarTab === 'history' ? '#fff' : 'var(--text-muted)',
+            }}>
+              {historyCount}
+            </span>
+          )}
         </button>
       </div>
 
       {sidebarTab === 'collection' ? (
         <>
           {/* 2. Collection Actions Bar (Fixed Below Sidebar Header) */}
-          <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: 'rgba(255,255,255,0.02)' }}>
-            <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Coleção</span>
+          <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'flex-end', background: 'rgba(255,255,255,0.02)' }}>
             <div className="sidebar-actions" style={{ gap: '2px' }}>
               <button className="btn-icon" onClick={() => setShowNewWorkspaceInput(true)} title="Novo Workspace" style={{ padding: '5px' }}><Database size={14} /></button>
               <button className="btn-icon" onClick={exportCollectionProp} title="Exportar" style={{ padding: '5px' }}><Download size={14} /></button>
@@ -335,18 +366,27 @@ export const CollectionTree: React.FC<CollectionTreeProps> = ({ exportCollection
         </>
       ) : (
         <div className="sidebar-history-container" style={{ flex: 1, padding: '16px 14px', overflowY: 'auto', background: 'rgba(0,0,0,0.05)' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
-            <span style={{ fontSize: '11px', fontWeight: 700, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>Recentes</span>
-            <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
-              {activeNodeId ? (findParentWorkspace(activeNodeId)?.name || '') : ''}
-            </span>
-          </div>
+          {activeNodeId && findParentWorkspace(activeNodeId) && (
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '12px' }}>
+              <Database size={11} style={{ color: 'var(--accent-primary)', opacity: 0.7 }} />
+              <span style={{ fontSize: '10px', fontWeight: 700, color: 'var(--text-muted)', letterSpacing: '0.3px' }}>
+                {findParentWorkspace(activeNodeId)?.name}
+              </span>
+            </div>
+          )}
           {(() => {
             const wsHistory = activeNodeId ? getWorkspaceHistory(activeNodeId) : [];
             if (wsHistory.length === 0) return (
               <div style={{ padding: '40px 20px', textAlign: 'center', color: 'var(--text-muted)', fontSize: '12px' }}>
-                <svg style={{ opacity: 0.1, marginBottom: '12px', width: '32px', height: '32px' }} fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm3.5-9c.83 0 1.5-.67 1.5-1.5S16.33 8 15.5 8 14 8.67 14 9.5s.67 1.5 1.5 1.5zm-7 0c.83 0 1.5-.67 1.5-1.5S9.33 8 8.5 8 7 8.67 7 9.5 7.67 11 8.5 11zm3.5 6.5c2.33 0 4.31-1.46 5.11-3.5H6.89c.8 2.04 2.78 3.5 5.11 3.5z" /></svg>
-                <p>Nenhuma requisição feita recentemente.</p>
+                <div style={{
+                  width: '40px', height: '40px', borderRadius: '50%',
+                  backgroundColor: 'rgba(0,0,0,0.15)', border: '2px dashed var(--border-subtle)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  margin: '0 auto 10px',
+                }}>
+                  <Clock size={18} style={{ opacity: 0.35 }} />
+                </div>
+                <p style={{ margin: 0 }}>Nenhuma requisicao feita recentemente.</p>
               </div>
             );
             return wsHistory.map((entry: HistoryEntry) => (
@@ -383,15 +423,15 @@ export const CollectionTree: React.FC<CollectionTreeProps> = ({ exportCollection
               <h3 style={{ margin: 0, fontSize: '20px', letterSpacing: '-0.3px' }}>Confirmar Eliminação</h3>
             </div>
             <p style={{ color: 'var(--text-secondary)', marginBottom: '28px', lineHeight: 1.6 }}>
-              A deleção do item <strong style={{ color: 'var(--text-primary)' }}>"{nodeToDelete.name}"</strong> será irremovível. Pastas aninhadas também encontrarão seu fim. Prossigo?
+              O item <strong style={{ color: 'var(--text-primary)' }}>"{nodeToDelete.name}"</strong> sera excluido permanentemente. Pastas e itens aninhados tambem serao removidos.
             </p>
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '12px' }}>
-              <button className="btn btn-secondary" onClick={() => setNodeToDelete(null)}>Repensar 🤔</button>
-              <button className="btn btn-danger" onClick={confirmDelete}>Deletar Logo 💥</button>
+              <button className="btn btn-secondary" onClick={() => setNodeToDelete(null)}>Cancelar</button>
+              <button className="btn btn-danger" onClick={confirmDelete}>Excluir</button>
             </div>
           </div>
         </div>
       )}
-    </aside>
+    </div>
   );
 };

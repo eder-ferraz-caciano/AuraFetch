@@ -115,20 +115,20 @@ describe('AuraFetch - Import/Export de Coleção e Download de Response', () => 
       }).as('req');
       cy.get('.sidebar-tree-container').contains('Listar Dados').click({ force: true });
       cy.get('input[placeholder="{{base_url}}/api/..."]').clear().type(`${BASE}/get`, { parseSpecialCharSequences: false });
-      cy.contains('button', 'Fazer Disparo').click({ force: true });
+      cy.contains('button', 'Enviar').click({ force: true });
       cy.wait('@req');
       cy.get('.status-badge', { timeout: 15000 }).should('be.visible');
     });
 
     it('botão de download está disponível após receber response', () => {
-      cy.get('button[title="Salvar resposta no Disco"]').should('exist');
+      cy.get('button[title="Download"]').should('exist');
     });
 
     it('clicar no botão dispara download (âncora .click() chamado)', () => {
       cy.window().then(win => {
         cy.stub(win.HTMLAnchorElement.prototype, 'click').as('downloadClick');
       });
-      cy.get('button[title="Salvar resposta no Disco"]').click();
+      cy.get('button[title="Download"]').click();
       cy.get('@downloadClick').should('have.been.calledOnce');
     });
 
@@ -144,13 +144,13 @@ describe('AuraFetch - Import/Export de Coleção e Download de Response', () => 
           body: Cypress.Buffer.from(imgBase64, 'base64')
         }).as('imgReq');
         cy.get('input[placeholder="{{base_url}}/api/..."]').clear().type(`${BASE}/get`, { parseSpecialCharSequences: false });
-        cy.contains('button', 'Fazer Disparo').click({ force: true });
+        cy.contains('button', 'Enviar').click({ force: true });
         cy.wait('@imgReq');
         cy.get('.status-badge', { timeout: 15000 }).should('be.visible');
         cy.window().then(win => {
           cy.stub(win.HTMLAnchorElement.prototype, 'click').as('imgDownloadClick');
         });
-        cy.get('button[title="Salvar resposta no Disco"]').click({ force: true });
+        cy.get('button[title="Download"]').click({ force: true });
         cy.get('@imgDownloadClick').should('have.been.calledOnce');
       });
     });

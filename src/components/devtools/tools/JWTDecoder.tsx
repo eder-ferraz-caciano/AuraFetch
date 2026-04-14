@@ -249,6 +249,33 @@ export const JWTDecoder: React.FC<JWTDecoderProps> = () => {
             </pre>
           </div>
 
+          {/* Expiration Status */}
+          {tokenParts.payload && typeof tokenParts.payload.exp === 'number' && (() => {
+            const exp = tokenParts.payload.exp as number;
+            const isExpired = exp < Math.floor(Date.now() / 1000);
+            return (
+              <div
+                style={{
+                  padding: '12px 16px',
+                  backgroundColor: isExpired ? 'rgba(239,68,68,0.1)' : 'rgba(34,197,94,0.1)',
+                  border: `1px solid ${isExpired ? 'rgb(239,68,68)' : 'rgb(34,197,94)'}`,
+                  borderRadius: '4px',
+                  color: isExpired ? 'rgb(239,68,68)' : 'rgb(22,163,74)',
+                  fontSize: '12px',
+                  fontWeight: '600',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  gap: '4px',
+                }}
+              >
+                <span>{isExpired ? 'Token Expirado' : 'Token Valido'}</span>
+                <span style={{ fontWeight: 'normal', fontSize: '11px' }}>
+                  Expira em: {new Date(exp * 1000).toLocaleString('pt-BR')}
+                </span>
+              </div>
+            );
+          })()}
+
           {/* Payload Section */}
           <div
             style={{

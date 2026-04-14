@@ -6,7 +6,7 @@ describe('AuraFetch - Autenticação', () => {
     cy.visit('/');
     cy.get('.app-title', { timeout: 30000 }).should('be.visible');
     cy.get('.sidebar-tree-container').contains('Listar Dados').click({ force: true });
-    cy.get('.tab').contains('Autenticação').click();
+    cy.get('.tab').contains('Auth').click();
   });
 
   // ────────────────────────────────────────
@@ -23,7 +23,7 @@ describe('AuraFetch - Autenticação', () => {
       cy.get('input[placeholder*="meu_token_jwt"]').clear().type('meu_token_secreto');
       cy.intercept('GET', `${POSTMAN_ECHO}/headers`).as('req');
       cy.get('input[placeholder="{{base_url}}/api/..."]').clear().type(`${POSTMAN_ECHO}/headers`, { parseSpecialCharSequences: false });
-      cy.contains('button', 'Fazer Disparo').click({ force: true });
+      cy.contains('button', 'Enviar').click({ force: true });
       cy.wait('@req').then(interception => {
         expect(interception.request.headers['authorization']).to.equal('Bearer meu_token_secreto');
       });
@@ -43,12 +43,12 @@ describe('AuraFetch - Autenticação', () => {
       cy.wait(300);
       // Voltar para a requisição e configurar Bearer com variável
       cy.get('.sidebar-tree-container').contains('Listar Dados').click({ force: true });
-      cy.get('.tab').contains('Autenticação').click();
+      cy.get('.tab').contains('Auth').click();
       cy.get('.glass-panel select').select('bearer');
       cy.get('input[placeholder*="meu_token_jwt"]').clear().type('{{meu_token}}', { parseSpecialCharSequences: false });
       cy.intercept('GET', `${POSTMAN_ECHO}/headers`).as('req');
       cy.get('input[placeholder="{{base_url}}/api/..."]').clear().type(`${POSTMAN_ECHO}/headers`, { parseSpecialCharSequences: false });
-      cy.contains('button', 'Fazer Disparo').click({ force: true });
+      cy.contains('button', 'Enviar').click({ force: true });
       cy.wait('@req', { timeout: 15000 }).then(interception => {
         expect(interception.request.headers['authorization']).to.equal('Bearer token_do_env');
       });
@@ -71,7 +71,7 @@ describe('AuraFetch - Autenticação', () => {
       cy.get('input[placeholder="••••••"]').clear().type('senha123');
       cy.intercept('GET', `${POSTMAN_ECHO}/headers`).as('req');
       cy.get('input[placeholder="{{base_url}}/api/..."]').clear().type(`${POSTMAN_ECHO}/headers`, { parseSpecialCharSequences: false });
-      cy.contains('button', 'Fazer Disparo').click({ force: true });
+      cy.contains('button', 'Enviar').click({ force: true });
       cy.wait('@req').then(interception => {
         const auth = interception.request.headers['authorization'] as string;
         expect(auth).to.match(/^Basic /);
@@ -91,13 +91,13 @@ describe('AuraFetch - Autenticação', () => {
       cy.wait(300);
       // Voltar para a requisição
       cy.get('.sidebar-tree-container').contains('Listar Dados').click({ force: true });
-      cy.get('.tab').contains('Autenticação').click();
+      cy.get('.tab').contains('Auth').click();
       cy.get('.glass-panel select').select('basic');
       cy.get('input[placeholder="admin"]').clear().type('{{basic_user}}', { parseSpecialCharSequences: false });
       cy.get('input[placeholder="••••••"]').clear().type('pass123');
       cy.intercept('GET', `${POSTMAN_ECHO}/headers`).as('req');
       cy.get('input[placeholder="{{base_url}}/api/..."]').clear().type(`${POSTMAN_ECHO}/headers`, { parseSpecialCharSequences: false });
-      cy.contains('button', 'Fazer Disparo').click({ force: true });
+      cy.contains('button', 'Enviar').click({ force: true });
       cy.wait('@req', { timeout: 15000 }).then(interception => {
         const auth = interception.request.headers['authorization'] as string;
         expect(auth).to.match(/^Basic /);
@@ -127,7 +127,7 @@ describe('AuraFetch - Autenticação', () => {
       cy.get('.glass-panel select').last().select('header');
       cy.intercept('GET', `${POSTMAN_ECHO}/headers*`).as('req');
       cy.get('input[placeholder="{{base_url}}/api/..."]').clear().type(`${POSTMAN_ECHO}/headers`, { parseSpecialCharSequences: false });
-      cy.contains('button', 'Fazer Disparo').click({ force: true });
+      cy.contains('button', 'Enviar').click({ force: true });
       cy.wait('@req', { timeout: 15000 }).then(interception => {
         expect(interception.request.headers['x-minha-chave']).to.equal('chave_secreta_123');
       });
@@ -141,7 +141,7 @@ describe('AuraFetch - Autenticação', () => {
       cy.get('.glass-panel select').last().select('query');
       cy.intercept('GET', `${POSTMAN_ECHO}/get*`).as('req');
       cy.get('input[placeholder="{{base_url}}/api/..."]').clear().type(`${POSTMAN_ECHO}/get`, { parseSpecialCharSequences: false });
-      cy.contains('button', 'Fazer Disparo').click({ force: true });
+      cy.contains('button', 'Enviar').click({ force: true });
       cy.wait('@req').then(interception => {
         // API key deve aparecer na URL, não no header
         expect(interception.request.url).to.include('api_key=qp_valor_123');
@@ -167,30 +167,29 @@ describe('AuraFetch - Autenticação', () => {
   // ────────────────────────────────────────
   describe('Herança de autenticação por pasta', () => {
     it('requisição herda Bearer da pasta pai', () => {
+      // Folder config abre na aba auth por padrão (sem .tab class)
       cy.get('.sidebar-tree-container').contains('Meu Servidor/Projeto').click({ force: true });
-      cy.get('.tab').contains('Autenticação').click();
-      cy.get('select').first().select('bearer');
+      cy.get('.select-input').first().select('bearer');
       cy.get('input[placeholder*="meu_token_jwt"]').type('TOKEN_HERDADO');
       // Verificar que a requisição filha tem "inherit"
       cy.get('.sidebar-tree-container').contains('Listar Dados').click({ force: true });
-      cy.get('.tab').contains('Autenticação').click();
+      cy.get('.tab').contains('Auth').click();
       cy.get('.glass-panel select').should('have.value', 'inherit');
-      cy.contains('Esta requisição herda a autenticação da pasta pai').should('be.visible');
+      cy.contains('Herda autenticacao da pasta pai').should('be.visible');
     });
 
     it('requisição com auth própria sobrescreve a pasta', () => {
       cy.get('.sidebar-tree-container').contains('Meu Servidor/Projeto').click({ force: true });
-      cy.get('.tab').contains('Autenticação').click();
-      cy.get('select').first().select('bearer');
+      cy.get('.select-input').first().select('bearer');
       cy.get('input[placeholder*="meu_token_jwt"]').type('TOKEN_PASTA');
       cy.get('.sidebar-tree-container').contains('Listar Dados').click({ force: true });
-      cy.get('.tab').contains('Autenticação').click();
+      cy.get('.tab').contains('Auth').click();
       // Mudar para bearer próprio
       cy.get('.glass-panel select').select('bearer');
       cy.get('input[placeholder*="meu_token_jwt"]').clear().type('TOKEN_PROPRIO');
       cy.intercept('GET', `${POSTMAN_ECHO}/headers`).as('req');
       cy.get('input[placeholder="{{base_url}}/api/..."]').clear().type(`${POSTMAN_ECHO}/headers`, { parseSpecialCharSequences: false });
-      cy.contains('button', 'Fazer Disparo').click({ force: true });
+      cy.contains('button', 'Enviar').click({ force: true });
       cy.wait('@req').then(interception => {
         expect(interception.request.headers['authorization']).to.equal('Bearer TOKEN_PROPRIO');
       });
@@ -198,15 +197,14 @@ describe('AuraFetch - Autenticação', () => {
 
     it('requisição com auth "none" ignora a auth da pasta', () => {
       cy.get('.sidebar-tree-container').contains('Meu Servidor/Projeto').click({ force: true });
-      cy.get('.tab').contains('Autenticação').click();
-      cy.get('select').first().select('bearer');
+      cy.get('.select-input').first().select('bearer');
       cy.get('input[placeholder*="meu_token_jwt"]').type('TOKEN_PASTA');
       cy.get('.sidebar-tree-container').contains('Listar Dados').click({ force: true });
-      cy.get('.tab').contains('Autenticação').click();
+      cy.get('.tab').contains('Auth').click();
       cy.get('.glass-panel select').select('none');
       cy.intercept('GET', `${POSTMAN_ECHO}/headers`).as('req');
       cy.get('input[placeholder="{{base_url}}/api/..."]').clear().type(`${POSTMAN_ECHO}/headers`, { parseSpecialCharSequences: false });
-      cy.contains('button', 'Fazer Disparo').click({ force: true });
+      cy.contains('button', 'Enviar').click({ force: true });
       cy.wait('@req').then(interception => {
         expect(interception.request.headers['authorization']).to.be.undefined;
       });

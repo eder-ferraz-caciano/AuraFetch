@@ -9,6 +9,7 @@
   --bg-panel-hover: rgba(43, 47, 68, 0.8);
 
   --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-color: rgba(255, 255, 255, 0.12);
   --border-strong: rgba(255, 255, 255, 0.12);
   --border-glow: rgba(99, 102, 241, 0.3);
 
@@ -1258,10 +1259,6 @@ pre.json-viewer {
   animation: scaleIn 0.3s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
-/* Animations */
-.fade-in {
-  animation: fadeIn 0.4s ease-out;
-}
 
 @keyframes fadeIn {
   from {
@@ -1373,6 +1370,7 @@ body.theme-light {
   --bg-panel-hover: rgba(226, 232, 240, 0.8);
 
   --border-subtle: rgba(0, 0, 0, 0.08);
+  --border-color: rgba(0, 0, 0, 0.15);
   --border-strong: rgba(0, 0, 0, 0.15);
   --border-glow: rgba(99, 102, 241, 0.25);
 

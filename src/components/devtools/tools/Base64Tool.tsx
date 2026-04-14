@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
-import { Copy, Trash2 } from 'lucide-react';
+import { Copy, ArrowRightLeft, Hash, Trash2 } from 'lucide-react';
 
 interface Base64ToolProps {
   onBack?: () => void;
 }
 
+type Mode = 'encode' | 'decode';
+
 export const Base64Tool: React.FC<Base64ToolProps> = () => {
-  const [mode, setMode] = useState<'encode' | 'decode'>('encode');
+  const [mode, setMode] = useState<Mode>('encode');
   const [input, setInput] = useState('');
   const [output, setOutput] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -14,288 +16,271 @@ export const Base64Tool: React.FC<Base64ToolProps> = () => {
 
   useEffect(() => {
     setError(null);
-
-    if (!input.trim()) {
-      setOutput('');
-      return;
-    }
-
+    if (!input.trim()) { setOutput(''); return; }
     try {
       if (mode === 'encode') {
-        const encoded = btoa(unescape(encodeURIComponent(input)));
-        setOutput(encoded);
+        setOutput(btoa(unescape(encodeURIComponent(input))));
       } else {
-        const decoded = decodeURIComponent(escape(atob(input)));
-        setOutput(decoded);
+        setOutput(decodeURIComponent(escape(atob(input))));
       }
     } catch {
-      if (mode === 'decode') {
-        setError('Texto Base64 inválido');
-        setOutput('');
-      } else {
-        setError('Erro ao codificar');
-        setOutput('');
-      }
+      setError(mode === 'decode' ? 'Base64 invalido' : 'Erro ao codificar');
+      setOutput('');
     }
   }, [input, mode]);
 
   const handleCopy = async () => {
     if (!output) return;
-
     try {
       await navigator.clipboard.writeText(output);
       setCopySuccess(true);
       setTimeout(() => setCopySuccess(false), 2000);
-    } catch {
-      // Silently fail on copy error
-    }
+    } catch { /* ignore */ }
   };
 
-  const handleClear = () => {
-    setInput('');
-    setOutput('');
-    setError(null);
+  const handleSwap = () => {
+    if (!output) return;
+    const newInput = output;
+    setMode(mode === 'encode' ? 'decode' : 'encode');
+    setInput(newInput);
   };
 
-  const inputPlaceholder = mode === 'encode' ? 'Digite o texto para codificar' : 'Cole o texto Base64 para decodificar';
+  // ─── Styles ─────────────────────────────
+
+  const modePill = (active: boolean): React.CSSProperties => ({
+    padding: '5px 14px', fontSize: '10px', fontWeight: '700', cursor: 'pointer',
+    letterSpacing: '0.5px', textTransform: 'uppercase',
+    backgroundColor: active ? 'var(--accent-primary)' : 'transparent',
+    border: `1.5px solid ${active ? 'var(--accent-primary)' : 'var(--border-color)'}`,
+    borderRadius: '20px',
+    color: active ? 'white' : 'var(--text-muted)',
+    transition: 'all 0.15s ease',
+  });
+
+  const textareaStyle: React.CSSProperties = {
+    padding: '12px',
+    backgroundColor: 'var(--bg-panel)',
+    border: '1px solid var(--border-color)',
+    borderRadius: '0 0 8px 8px',
+    color: 'var(--text-primary)',
+    fontFamily: 'monospace',
+    fontSize: '12px',
+    minHeight: '160px',
+    resize: 'vertical',
+    lineHeight: '1.6',
+    outline: 'none',
+    wordBreak: 'break-all',
+  };
+
+  const panelHeader: React.CSSProperties = {
+    padding: '5px 10px', backgroundColor: 'var(--bg-deep)',
+    borderRadius: '8px 8px 0 0',
+    border: '1px solid var(--border-color)', borderBottom: 'none',
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+  };
+
+  const headerLabel: React.CSSProperties = {
+    fontSize: '10px', fontWeight: '700', color: 'var(--text-muted)',
+    letterSpacing: '1px', textTransform: 'uppercase',
+  };
+
+  const charBadge: React.CSSProperties = {
+    fontSize: '9px', fontFamily: 'monospace', color: 'var(--text-muted)',
+    padding: '1px 6px', backgroundColor: 'var(--bg-panel)', borderRadius: '3px',
+  };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-      {/* Mode Tabs */}
-      <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid var(--border-color)', paddingBottom: '12px' }}>
-        <button
-          onClick={() => setMode('encode')}
-          style={{
-            padding: '8px 16px',
-            backgroundColor: mode === 'encode' ? 'var(--accent-primary)' : 'transparent',
-            color: mode === 'encode' ? 'white' : 'var(--text-secondary)',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontSize: '13px',
-            fontWeight: '600',
-            transition: 'all 0.2s',
-          }}
-          onMouseEnter={(e) => {
-            if (mode !== 'encode') {
-              e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.1)';
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (mode !== 'encode') {
-              e.currentTarget.style.backgroundColor = 'transparent';
-            }
-          }}
-        >
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+
+      {/* ── Header: Mode pills ── */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap',
+        padding: '8px 12px',
+        backgroundColor: 'var(--bg-deep)',
+        border: '1px solid var(--border-color)', borderRadius: '8px',
+      }}>
+        <button style={modePill(mode === 'encode')} onClick={() => setMode('encode')}>
           Codificar
         </button>
-        <button
-          onClick={() => setMode('decode')}
-          style={{
-            padding: '8px 16px',
-            backgroundColor: mode === 'decode' ? 'var(--accent-primary)' : 'transparent',
-            color: mode === 'decode' ? 'white' : 'var(--text-secondary)',
-            border: 'none',
-            borderRadius: '4px',
-            cursor: 'pointer',
-            fontSize: '13px',
-            fontWeight: '600',
-            transition: 'all 0.2s',
-          }}
-          onMouseEnter={(e) => {
-            if (mode !== 'decode') {
-              e.currentTarget.style.backgroundColor = 'rgba(59, 130, 246, 0.1)';
-            }
-          }}
-          onMouseLeave={(e) => {
-            if (mode !== 'decode') {
-              e.currentTarget.style.backgroundColor = 'transparent';
-            }
-          }}
-        >
+        <button style={modePill(mode === 'decode')} onClick={() => setMode('decode')}>
           Decodificar
         </button>
-      </div>
 
-      {/* Input Section */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-        <label
-          style={{
-            fontSize: '12px',
-            fontWeight: '600',
-            color: 'var(--text-secondary)',
-            textTransform: 'uppercase',
-            letterSpacing: '0.5px',
-          }}
-        >
-          Entrada
-        </label>
-        <textarea
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder={inputPlaceholder}
-          style={{
-            padding: '12px',
-            backgroundColor: 'var(--bg-panel)',
-            border: '1px solid var(--border-color)',
-            borderRadius: '4px',
-            color: 'var(--text-primary)',
-            fontFamily: 'monospace',
-            fontSize: '12px',
-            minHeight: '140px',
-            resize: 'vertical',
-            fontWeight: '500',
-            wordBreak: 'break-all',
-          }}
-        />
-      </div>
+        <div style={{ flex: 1 }} />
 
-      {/* Error Message */}
-      {error && (
-        <div
-          style={{
-            padding: '12px',
-            backgroundColor: 'var(--danger-bg)',
-            border: '1px solid var(--danger)',
-            borderRadius: '4px',
-            color: 'var(--danger)',
-            fontSize: '12px',
-            fontWeight: '500',
-          }}
-        >
-          {error}
-        </div>
-      )}
-
-      {/* Output Section */}
-      {!error && output && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <div
-            style={{
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-            }}
-          >
-            <label
-              style={{
-                fontSize: '12px',
-                fontWeight: '600',
-                color: 'var(--text-secondary)',
-                textTransform: 'uppercase',
-                letterSpacing: '0.5px',
-              }}
-            >
-              Saída
-            </label>
-            <button
-              onClick={handleCopy}
-              style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center',
-                padding: '6px 10px',
-                backgroundColor: copySuccess ? 'rgb(34, 197, 94)' : 'var(--bg-panel)',
-                border: `1px solid ${copySuccess ? 'rgb(34, 197, 94)' : 'var(--border-color)'}`,
-                borderRadius: '4px',
-                color: copySuccess ? 'white' : 'var(--text-primary)',
-                cursor: 'pointer',
-                fontSize: '12px',
-                fontWeight: '600',
-                transition: 'all 0.2s',
-                gap: '4px',
-              }}
-              onMouseEnter={(e) => {
-                if (!copySuccess) {
-                  e.currentTarget.style.backgroundColor = 'var(--accent-primary)';
-                  e.currentTarget.style.color = 'white';
-                  e.currentTarget.style.borderColor = 'var(--accent-primary)';
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!copySuccess) {
-                  e.currentTarget.style.backgroundColor = 'var(--bg-panel)';
-                  e.currentTarget.style.color = 'var(--text-primary)';
-                  e.currentTarget.style.borderColor = 'var(--border-color)';
-                }
-              }}
-              title={copySuccess ? 'Copiado!' : 'Copiar saída'}
-            >
-              <Copy size={14} />
-              {copySuccess ? 'Copiado' : 'Copiar'}
-            </button>
-          </div>
-          <textarea
-            value={output}
-            readOnly
-            style={{
-              padding: '12px',
-              backgroundColor: 'var(--bg-panel)',
-              border: '1px solid var(--border-color)',
-              borderRadius: '4px',
-              color: 'var(--text-primary)',
-              fontFamily: 'monospace',
-              fontSize: '12px',
-              minHeight: '140px',
-              resize: 'vertical',
-              fontWeight: '500',
-              wordBreak: 'break-all',
-              cursor: 'default',
-              opacity: 0.9,
-            }}
-          />
-        </div>
-      )}
-
-      {/* Empty State */}
-      {!error && !output && (
-        <div
-          style={{
-            textAlign: 'center',
-            padding: '40px 20px',
-            color: 'var(--text-muted)',
-            fontSize: '13px',
-          }}
-        >
-          Digite ou cole algum texto acima
-        </div>
-      )}
-
-      {/* Action Buttons */}
-      {input && (
-        <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+        {/* Swap */}
+        {output && (
           <button
-            onClick={handleClear}
+            onClick={handleSwap}
             style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              padding: '8px 16px',
-              backgroundColor: 'var(--bg-panel)',
-              border: '1px solid var(--border-color)',
-              borderRadius: '4px',
-              color: 'var(--text-primary)',
-              cursor: 'pointer',
-              fontSize: '13px',
-              fontWeight: '600',
-              transition: 'all 0.2s',
-              gap: '6px',
+              display: 'flex', alignItems: 'center', gap: '4px',
+              padding: '4px 10px', fontSize: '10px', fontWeight: '700',
+              backgroundColor: 'transparent',
+              border: '1px solid var(--border-color)', borderRadius: '20px',
+              color: 'var(--text-muted)', cursor: 'pointer',
+              transition: 'all 0.15s ease',
             }}
             onMouseEnter={(e) => {
-              e.currentTarget.style.backgroundColor = 'rgba(239, 68, 68, 0.1)';
-              e.currentTarget.style.borderColor = 'rgb(239, 68, 68)';
-              e.currentTarget.style.color = 'rgb(239, 68, 68)';
+              e.currentTarget.style.borderColor = 'var(--accent-primary)';
+              e.currentTarget.style.color = 'var(--accent-primary)';
             }}
             onMouseLeave={(e) => {
-              e.currentTarget.style.backgroundColor = 'var(--bg-panel)';
               e.currentTarget.style.borderColor = 'var(--border-color)';
-              e.currentTarget.style.color = 'var(--text-primary)';
+              e.currentTarget.style.color = 'var(--text-muted)';
             }}
-            title="Limpar entrada e saída"
+            title="Inverter entrada/saida"
           >
-            <Trash2 size={16} />
-            Limpar
+            <ArrowRightLeft size={11} /> Inverter
           </button>
+        )}
+
+        {input && (
+          <button
+            onClick={() => { setInput(''); setOutput(''); setError(null); }}
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              width: '26px', height: '26px', border: '1px solid var(--border-color)',
+              borderRadius: '50%', backgroundColor: 'transparent',
+              color: 'var(--text-muted)', cursor: 'pointer',
+              transition: 'all 0.15s ease',
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.borderColor = 'var(--danger)';
+              e.currentTarget.style.color = 'var(--danger)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.borderColor = 'var(--border-color)';
+              e.currentTarget.style.color = 'var(--text-muted)';
+            }}
+            title="Limpar"
+          >
+            <Trash2 size={11} />
+          </button>
+        )}
+      </div>
+
+      {/* ── Side-by-side panels ── */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: '1fr 1fr',
+        gap: '12px',
+      }}>
+        {/* Input panel */}
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <div style={panelHeader}>
+            <span style={headerLabel}>
+              {mode === 'encode' ? 'Texto' : 'Base64'}
+            </span>
+            {input && (
+              <span style={charBadge}>{input.length} chars</span>
+            )}
+          </div>
+          <textarea
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder={mode === 'encode' ? 'Texto para codificar...' : 'Base64 para decodificar...'}
+            spellCheck={false}
+            style={textareaStyle}
+          />
+        </div>
+
+        {/* Output panel */}
+        <div style={{ display: 'flex', flexDirection: 'column' }}>
+          <div style={panelHeader}>
+            <span style={headerLabel}>
+              {mode === 'encode' ? 'Base64' : 'Texto'}
+            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+              {output && (
+                <span style={charBadge}>{output.length} chars</span>
+              )}
+              {output && (
+                <button
+                  onClick={handleCopy}
+                  style={{
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    width: '22px', height: '22px', border: 'none', borderRadius: '4px',
+                    backgroundColor: copySuccess ? 'rgb(34,197,94)' : 'transparent',
+                    color: copySuccess ? 'white' : 'var(--text-muted)', cursor: 'pointer',
+                    transition: 'all 0.15s ease',
+                  }}
+                  title={copySuccess ? 'Copiado!' : 'Copiar'}
+                  onMouseEnter={(e) => { if (!copySuccess) e.currentTarget.style.color = 'var(--accent-primary)'; }}
+                  onMouseLeave={(e) => { if (!copySuccess) e.currentTarget.style.color = 'var(--text-muted)'; }}
+                >
+                  <Copy size={12} />
+                </button>
+              )}
+            </div>
+          </div>
+          {error ? (
+            <div style={{
+              ...textareaStyle,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              color: 'var(--danger)', fontSize: '11px', fontWeight: '600',
+              minHeight: '160px',
+              backgroundColor: 'rgba(239,68,68,0.04)',
+              border: '1px solid rgba(239,68,68,0.2)',
+            }}>
+              {error}
+            </div>
+          ) : (
+            <textarea
+              value={output}
+              readOnly
+              placeholder="Resultado aparece aqui..."
+              style={{
+                ...textareaStyle,
+                cursor: 'default',
+                opacity: output ? 1 : 0.5,
+              }}
+            />
+          )}
+        </div>
+      </div>
+
+      {/* ── Stats row ── */}
+      {output && (
+        <div style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '16px',
+          padding: '4px 0',
+        }}>
+          <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+            {mode === 'encode' ? 'Texto' : 'Base64'}: <strong>{input.length}</strong> chars
+          </span>
+          <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>→</span>
+          <span style={{ fontSize: '10px', color: 'var(--text-muted)' }}>
+            {mode === 'encode' ? 'Base64' : 'Texto'}: <strong>{output.length}</strong> chars
+          </span>
+          {mode === 'encode' && (
+            <span style={{
+              fontSize: '9px', fontFamily: 'monospace', color: 'var(--accent-primary)',
+              padding: '1px 6px', backgroundColor: 'var(--bg-deep)', borderRadius: '3px',
+              fontWeight: '600',
+            }}>
+              +{Math.round(((output.length - input.length) / Math.max(input.length, 1)) * 100)}%
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* ── Empty state ── */}
+      {!input && !output && (
+        <div style={{
+          textAlign: 'center', padding: '24px 20px', color: 'var(--text-muted)', fontSize: '12px',
+        }}>
+          <div style={{
+            width: '48px', height: '48px', borderRadius: '50%',
+            backgroundColor: 'var(--bg-deep)', border: '2px dashed var(--border-color)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            margin: '0 auto 10px',
+          }}>
+            <Hash size={20} style={{ opacity: 0.35 }} />
+          </div>
+          <div style={{ fontWeight: '600', marginBottom: '3px', color: 'var(--text-primary)', fontSize: '13px' }}>
+            Base64
+          </div>
+          <div>Converte automaticamente ao digitar</div>
         </div>
       )}
     </div>

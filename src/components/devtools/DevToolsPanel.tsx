@@ -12,19 +12,26 @@ import {
   ArrowLeft,
   Globe,
   Activity,
+  Printer,
+  Camera,
+  Columns2,
 } from 'lucide-react';
 import { QRCodeGenerator } from './tools/QRCodeGenerator';
 import { BarcodeGenerator } from './tools/BarcodeGenerator';
 import { UUIDGenerator } from './tools/UUIDGenerator';
 import { Base64Tool } from './tools/Base64Tool';
-import { JWTDecoder } from './tools/JWTDecoder';
+import { JWTTool } from './tools/JWTTool';
 import { CronHelper } from './tools/CronHelper';
 import { RegexTester } from './tools/RegexTester';
 import { CPFCNPJValidator } from './tools/CPFCNPJValidator';
 import { HashCalculator } from './tools/HashCalculator';
-import { IpInfoTool } from './tools/IpInfoTool';
-import { DnsLookupTool } from './tools/DnsLookupTool';
-import { PingTool } from './tools/PingTool';
+import { NetworkTool } from './tools/NetworkTool';
+import { PasswordGenerator } from './tools/PasswordGenerator';
+import { JsonYamlTool } from './tools/JsonYamlTool';
+import { UrlEncodeTool } from './tools/UrlEncodeTool';
+import { LabelPrinterTool } from './tools/LabelPrinterTool';
+import { RtspCameraTool } from './tools/RtspCameraTool';
+import { TextDiffTool } from './tools/TextDiffTool';
 
 interface ToolDefinition {
   id: string;
@@ -65,10 +72,10 @@ const tools: ToolDefinition[] = [
   },
   {
     id: 'jwt',
-    label: 'Decodificador JWT',
-    description: 'Decodifique e analise tokens JWT',
+    label: 'JWT',
+    description: 'Decodifique e gere tokens JWT',
     icon: <Shield size={24} />,
-    component: JWTDecoder,
+    component: JWTTool,
   },
   {
     id: 'cron',
@@ -99,25 +106,53 @@ const tools: ToolDefinition[] = [
     component: HashCalculator,
   },
   {
-    id: 'ipinfo',
-    label: 'Informações do IP',
-    description: 'IP público e geolocalização',
-    icon: <Globe size={24} />,
-    component: IpInfoTool,
+    id: 'password',
+    label: 'Gerador Senha',
+    description: 'Gere senhas aleatórias seguras',
+    icon: <Key size={24} />,
+    component: PasswordGenerator,
   },
   {
-    id: 'dnslookup',
-    label: 'Lookup DNS',
-    description: 'Resolver nomes de domínio',
-    icon: <Globe size={24} />,
-    component: DnsLookupTool,
+    id: 'jsonyaml',
+    label: 'JSON \u2194 YAML',
+    description: 'Converta entre JSON e YAML',
+    icon: <FileText size={24} />,
+    component: JsonYamlTool,
   },
   {
-    id: 'ping',
-    label: 'Ping',
-    description: 'Testar latência de conexão',
+    id: 'urlencode',
+    label: 'URL Codificação',
+    description: 'Codifique e decodifique URLs',
+    icon: <Globe size={24} />,
+    component: UrlEncodeTool,
+  },
+  {
+    id: 'network',
+    label: 'Rede',
+    description: 'Ping, IP Info e DNS Lookup',
     icon: <Activity size={24} />,
-    component: PingTool,
+    component: NetworkTool,
+  },
+  {
+    id: 'labelprinter',
+    label: 'Impressora Etiquetas',
+    description: 'Enviar ZPL/DPL para Zebra e Datamax',
+    icon: <Printer size={24} />,
+    component: LabelPrinterTool,
+  },
+  {
+    id: 'rtsp',
+    label: 'Testador RTSP',
+    description: 'Testar câmeras e controlar PTZ',
+    icon: <Camera size={24} />,
+    component: RtspCameraTool,
+  },
+  {
+    id: 'textdiff',
+    label: 'Text Diff',
+    description: 'Compare textos e veja as diferenças',
+    icon: <Columns2 size={24} />,
+    component: TextDiffTool,
   },
 ];
 

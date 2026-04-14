@@ -456,7 +456,7 @@ describe('AuraFetch – Params, Queries & URL Synchronization', () => {
     // 1. QUERIES TAB – TABLE → URL (2-way sync)
     // ────────────────────────────────────────────
     it('Deve adicionar Query Param na tabela e sincronizar com a URL', () => {
-        cy.get('.tab').contains('Queries').click();
+        cy.get('.tab').contains('Query').click();
 
         cy.contains('button', 'Adicionar Linha').first().click();
 
@@ -473,7 +473,7 @@ describe('AuraFetch – Params, Queries & URL Synchronization', () => {
     // 2. QUERIES TAB – URL → TABLE (2-way sync)
     // ────────────────────────────────────────────
     it('Deve preencher a tabela de Queries ao digitar na URL', () => {
-        cy.get('.tab').contains('Queries').click();
+        cy.get('.tab').contains('Query').click();
 
         cy.get('input[placeholder="{{base_url}}/api/..."]')
             .clear()
@@ -491,7 +491,7 @@ describe('AuraFetch – Params, Queries & URL Synchronization', () => {
             .clear()
             .type(`${POSTMAN_ECHO}/users/:userId/posts/:postId`, { parseSpecialCharSequences: false });
 
-        cy.get('.tab').contains('Params (URL)').click();
+        cy.get('.tab').contains('Params').click();
 
         cy.get('input[placeholder="Chave"]').then(($inputs) => {
             const keys = $inputs.toArray().map(el => (el as HTMLInputElement).value);
@@ -513,16 +513,16 @@ describe('AuraFetch – Params, Queries & URL Synchronization', () => {
             .clear()
             .type(`${POSTMAN_ECHO}/get/user/:id`, { parseSpecialCharSequences: false });
 
-        cy.get('.tab').contains('Params (URL)').click();
+        cy.get('.tab').contains('Params').click();
 
         // Fill in value for :id
         cy.get('input[placeholder="Valor"]').last().type('42', { parseSpecialCharSequences: false });
 
         // Switch to Queries tab to trigger any query parsing (should be empty for path params but keeps test structure)
-        cy.get('.tab').contains('Queries').click();
+        cy.get('.tab').contains('Query').click();
 
         // Verify path param parsing happened (go back to Params tab to check or check path params table if visible)
-        cy.get('.tab').contains('Params (URL)').click();
+        cy.get('.tab').contains('Params').click();
         cy.get('input[placeholder="Chave"]').should('have.length.at.least', 1).and('have.value', 'id');
     });
 
@@ -530,7 +530,7 @@ describe('AuraFetch – Params, Queries & URL Synchronization', () => {
     // 5. MULTIPLE QUERY PARAMS
     // ────────────────────────────────────────────
     it('Deve suportar múltiplos Query Params e enviar corretamente', () => {
-        cy.get('.tab').contains('Queries').click();
+        cy.get('.tab').contains('Query').click();
 
         // Add first query param
         cy.contains('button', 'Adicionar Linha').first().click();
@@ -557,7 +557,7 @@ describe('AuraFetch – Params, Queries & URL Synchronization', () => {
             .clear()
             .type(`${POSTMAN_ECHO}/get?framework=cypress&lang=ts`, { parseSpecialCharSequences: false });
 
-        cy.contains('button', 'Fazer Disparo').click({ force: true });
+        cy.contains('button', 'Enviar').click({ force: true });
         cy.get('.status-badge', { timeout: 25000 }).should('contain', '200');
         cy.get('.body-content').should('contain', 'framework').and('contain', 'cypress');
     });
@@ -566,9 +566,9 @@ describe('AuraFetch – Params, Queries & URL Synchronization', () => {
     // 7. HEADERS TAB
     // ────────────────────────────────────────────
     it('Deve adicionar Custom Header e validar echo', () => {
-        cy.get('.tab').contains('Headers Custo.').click();
+        cy.get('.tab').contains('Headers').click();
 
-        cy.contains('button', 'Nova Linha de Header').click();
+        cy.contains('button', 'Adicionar Header').click();
         cy.get('input[placeholder="Ex: Content-Type"]').last().clear().type('X-Cypress-Test', { parseSpecialCharSequences: false });
         cy.get('input[placeholder*="Ex: application/json"]').last().clear().type('e2e-value', { parseSpecialCharSequences: false });
 
@@ -576,7 +576,7 @@ describe('AuraFetch – Params, Queries & URL Synchronization', () => {
             .clear()
             .type(`${POSTMAN_ECHO}/headers`, { parseSpecialCharSequences: false });
 
-        cy.contains('button', 'Fazer Disparo').click({ force: true });
+        cy.contains('button', 'Enviar').click({ force: true });
         cy.get('.body-content', { timeout: 25000 }).should('contain', 'x-cypress-test');
     });
 
@@ -584,10 +584,11 @@ describe('AuraFetch – Params, Queries & URL Synchronization', () => {
     // 8. AUTH TAB (Autenticação)
     // ────────────────────────────────────────────
     it('Deve mostrar a aba Autenticação com seleção de tipo', () => {
-        cy.get('.tab').contains('Autenticação').click();
+        cy.get('.tab').contains('Auth').click();
 
-        // Should show auth-override selector
-        cy.contains('Sobrescrever Auth da Pasta').should('be.visible');
+        // Should show auth type selector
+        cy.contains('Esquema de Auth').should('be.visible');
+        cy.get('.glass-panel select').should('exist');
     });
 
     // ────────────────────────────────────────────
@@ -595,7 +596,7 @@ describe('AuraFetch – Params, Queries & URL Synchronization', () => {
     // ────────────────────────────────────────────
     it('Deve enviar JSON Body via POST', () => {
         cy.get('.method-select').select('POST');
-        cy.get('.tab').contains('Payload / Body').click();
+        cy.get('.tab').contains('Body').click();
         cy.contains('label', 'JSON').click();
 
         cy.get('.cm-content').first().focus().clear()
@@ -605,7 +606,7 @@ describe('AuraFetch – Params, Queries & URL Synchronization', () => {
             .clear()
             .type(`${POSTMAN_ECHO}/post`, { parseSpecialCharSequences: false });
 
-        cy.contains('button', 'Fazer Disparo').click({ force: true });
+        cy.contains('button', 'Enviar').click({ force: true });
         cy.get('.body-content', { timeout: 25000 }).should('contain', 'cypress_body');
     });
 });

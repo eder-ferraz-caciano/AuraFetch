@@ -21,7 +21,7 @@ describe('AuraFetch - Renderização de Response', () => {
         body: { usuario: { nome: 'Alice', idade: 30 }, ativo: true }
       }).as('req');
       cy.get('input[placeholder="{{base_url}}/api/..."]').clear().type(`${BASE}/get`, { parseSpecialCharSequences: false });
-      cy.contains('button', 'Fazer Disparo').click({ force: true });
+      cy.contains('button', 'Enviar').click({ force: true });
       cy.wait('@req');
       cy.get('.status-badge', { timeout: 15000 }).should('be.visible');
       // CodeMirror exibe o JSON formatado
@@ -32,7 +32,7 @@ describe('AuraFetch - Renderização de Response', () => {
       const largeJson = { items: Array.from({ length: 5000 }, (_, i) => ({ id: i, valor: 'x'.repeat(90) })) };
       cy.intercept('GET', `${BASE}/get*`, { statusCode: 200, body: largeJson }).as('bigReq');
       cy.get('input[placeholder="{{base_url}}/api/..."]').clear().type(`${BASE}/get`, { parseSpecialCharSequences: false });
-      cy.contains('button', 'Fazer Disparo').click({ force: true });
+      cy.contains('button', 'Enviar').click({ force: true });
       cy.wait('@bigReq');
       cy.get('.status-badge', { timeout: 15000 }).should('be.visible');
       // UI ainda responde — árvore clicável
@@ -51,7 +51,7 @@ describe('AuraFetch - Renderização de Response', () => {
         body: '<html><body><h1>Página de Teste</h1></body></html>'
       }).as('htmlReq');
       cy.get('input[placeholder="{{base_url}}/api/..."]').clear().type(`${BASE}/get`, { parseSpecialCharSequences: false });
-      cy.contains('button', 'Fazer Disparo').click({ force: true });
+      cy.contains('button', 'Enviar').click({ force: true });
       cy.wait('@htmlReq');
       cy.get('.status-badge', { timeout: 15000 }).should('be.visible');
       cy.get('iframe[title="HTML Preview"]').should('exist');
@@ -70,7 +70,7 @@ describe('AuraFetch - Renderização de Response', () => {
           body: Cypress.Buffer.from(imgBase64, 'base64')
         }).as('imgReq');
         cy.get('input[placeholder="{{base_url}}/api/..."]').clear().type(`${BASE}/get`, { parseSpecialCharSequences: false });
-        cy.contains('button', 'Fazer Disparo').click({ force: true });
+        cy.contains('button', 'Enviar').click({ force: true });
         cy.wait('@imgReq');
         cy.get('.status-badge', { timeout: 15000 }).should('be.visible');
         cy.get('.response-panel img[alt="Response"]').should('exist');
@@ -85,10 +85,10 @@ describe('AuraFetch - Renderização de Response', () => {
           body: Cypress.Buffer.from(imgBase64, 'base64')
         }).as('imgReq');
         cy.get('input[placeholder="{{base_url}}/api/..."]').clear().type(`${BASE}/get`, { parseSpecialCharSequences: false });
-        cy.contains('button', 'Fazer Disparo').click({ force: true });
+        cy.contains('button', 'Enviar').click({ force: true });
         cy.wait('@imgReq');
         cy.get('.status-badge', { timeout: 15000 }).should('be.visible');
-        cy.get('button[title="Salvar resposta no Disco"]').should('exist');
+        cy.get('button[title="Download"]').should('exist');
       });
     });
   });
@@ -104,10 +104,10 @@ describe('AuraFetch - Renderização de Response', () => {
         body: 'binary data here'
       }).as('binReq');
       cy.get('input[placeholder="{{base_url}}/api/..."]').clear().type(`${BASE}/get`, { parseSpecialCharSequences: false });
-      cy.contains('button', 'Fazer Disparo').click({ force: true });
+      cy.contains('button', 'Enviar').click({ force: true });
       cy.wait('@binReq');
       cy.get('.status-badge', { timeout: 15000 }).should('be.visible');
-      cy.get('.response-panel').should('contain', 'Arquivo Binário Detectado');
+      cy.get('.response-panel').should('contain', 'binario');
       cy.get('.response-panel button').contains('Baixar Arquivo').should('be.visible');
     });
   });
@@ -123,13 +123,13 @@ describe('AuraFetch - Renderização de Response', () => {
         body: { ok: true }
       }).as('req');
       cy.get('input[placeholder="{{base_url}}/api/..."]').clear().type(`${BASE}/get`, { parseSpecialCharSequences: false });
-      cy.contains('button', 'Fazer Disparo').click({ force: true });
+      cy.contains('button', 'Enviar').click({ force: true });
       cy.wait('@req');
       cy.get('.status-badge', { timeout: 15000 }).should('be.visible');
     });
 
     it('aba Response Headers mostra headers retornados', () => {
-      cy.get('.tab').contains('Response Headers').click();
+      cy.get('.bottom-tabs .tab').contains('Headers').click();
       cy.get('.body-content .headers-grid', { timeout: 10000 }).should('exist');
       cy.get('.body-content').should('contain', 'x-custom-header');
     });
@@ -139,7 +139,7 @@ describe('AuraFetch - Renderização de Response', () => {
     });
 
     it('aba Console mostra tempo de resposta', () => {
-      cy.get('.tab').contains('Console / Timestamps').click();
+      cy.get('.tab').contains('Console').click();
       cy.get('.console-panel', { timeout: 10000 }).should('contain', 'REQUISIÇÃO');
     });
 
@@ -150,7 +150,7 @@ describe('AuraFetch - Renderização de Response', () => {
       cy.get('.sidebar-tree-container').contains('Listar Dados').click({ force: true });
       cy.intercept('GET', `${BASE}/get*`, { statusCode: 404, body: { error: 'not found' } }).as('notFound');
       cy.get('input[placeholder="{{base_url}}/api/..."]').clear().type(`${BASE}/get`, { parseSpecialCharSequences: false });
-      cy.contains('button', 'Fazer Disparo').click({ force: true });
+      cy.contains('button', 'Enviar').click({ force: true });
       cy.wait('@notFound');
       cy.get('.status-badge', { timeout: 15000 }).should('contain', '404');
     });
@@ -162,7 +162,7 @@ describe('AuraFetch - Renderização de Response', () => {
       cy.get('.sidebar-tree-container').contains('Listar Dados').click({ force: true });
       cy.intercept('GET', `${BASE}/get*`, { statusCode: 500, body: { error: 'internal server error' } }).as('serverError');
       cy.get('input[placeholder="{{base_url}}/api/..."]').clear().type(`${BASE}/get`, { parseSpecialCharSequences: false });
-      cy.contains('button', 'Fazer Disparo').click({ force: true });
+      cy.contains('button', 'Enviar').click({ force: true });
       cy.wait('@serverError');
       cy.get('.status-badge', { timeout: 15000 }).should('contain', '500');
     });
@@ -175,7 +175,7 @@ describe('AuraFetch - Renderização de Response', () => {
     it('response NÃO persiste no localStorage após reload (regressão B5)', () => {
       cy.intercept('GET', `${BASE}/get*`, { statusCode: 200, body: { resultado: 'cache_test_unique_string' } }).as('req');
       cy.get('input[placeholder="{{base_url}}/api/..."]').clear().type(`${BASE}/get`, { parseSpecialCharSequences: false });
-      cy.contains('button', 'Fazer Disparo').click({ force: true });
+      cy.contains('button', 'Enviar').click({ force: true });
       cy.wait('@req');
       cy.get('.status-badge', { timeout: 15000 }).should('be.visible');
       cy.window().then(win => {
@@ -187,7 +187,7 @@ describe('AuraFetch - Renderização de Response', () => {
     it('trocar de nó limpa a response exibida', () => {
       cy.intercept('GET', `${BASE}/get*`, { statusCode: 200, body: { msg: 'aparece antes' } }).as('req');
       cy.get('input[placeholder="{{base_url}}/api/..."]').clear().type(`${BASE}/get`, { parseSpecialCharSequences: false });
-      cy.contains('button', 'Fazer Disparo').click({ force: true });
+      cy.contains('button', 'Enviar').click({ force: true });
       cy.wait('@req');
       cy.get('.status-badge', { timeout: 15000 }).should('be.visible');
       cy.get('.body-content').should('contain', 'aparece antes');
